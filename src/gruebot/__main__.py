@@ -362,6 +362,22 @@ def test(
         bool,
         typer.Option("--smoke", "-s", help="Run smoke test (just verify game starts)"),
     ] = False,
+    ai: Annotated[
+        bool,
+        typer.Option("--ai", "-a", help="Let Claude play the game (requires API key)"),
+    ] = False,
+    max_turns: Annotated[
+        int,
+        typer.Option("--max-turns", "-m", help="Maximum turns for AI play mode"),
+    ] = 50,
+    llm_backend: Annotated[
+        str,
+        typer.Option("--llm", "-l", help="LLM backend for AI mode: anthropic_api or claude_cli"),
+    ] = "anthropic_api",
+    model: Annotated[
+        str | None,
+        typer.Option("--model", "-M", help="Model for AI mode (e.g., claude-sonnet-4-20250514)"),
+    ] = None,
     expect_location: Annotated[
         str | None,
         typer.Option("--expect-location", help="Assert final location contains this text"),
@@ -369,6 +385,10 @@ def test(
     expect_text: Annotated[
         str | None,
         typer.Option("--expect-text", help="Assert final output contains this text"),
+    ] = None,
+    transcript: Annotated[
+        Path | None,
+        typer.Option("--transcript", "-t", help="Save transcript to this file (markdown)"),
     ] = None,
     config: Annotated[
         str | None,
@@ -395,7 +415,7 @@ def test(
         typer.Option("--verbose", "-v", help="Show detailed output"),
     ] = False,
 ) -> None:
-    """Test an interactive fiction game with walkthroughs or smoke tests.
+    """Test an interactive fiction game with walkthroughs, smoke tests, or AI play.
 
     Exit codes:
       0 - All tests passed
@@ -414,10 +434,13 @@ def test(
 
       # With assertions
       gruebot test game.z5 -w walkthrough.txt --expect-location "Treasure Room"
+
+      # Let Claude play and check assertions (requires ANTHROPIC_API_KEY)
+      gruebot test game.z5 --ai --max-turns 100 --expect-location "Treasure"
     """
     # Validate options
-    if not smoke and not walkthrough:
-        console.print("[red]Error:[/red] Must specify --smoke or --walkthrough")
+    if not smoke and not walkthrough and not ai:
+        console.print("[red]Error:[/red] Must specify --smoke, --walkthrough, or --ai")
         raise typer.Exit(ExitCode.INVALID_INPUT)
 
     # Determine game format
@@ -429,6 +452,10 @@ def test(
         console.print("  Mode: smoke test")
     elif walkthrough:
         console.print(f"  Mode: walkthrough ({walkthrough})")
+    elif ai:
+        display_model = model or "default"
+        console.print(f"  Mode: AI play ({llm_backend}, {display_model})")
+        console.print(f"  Max turns: {max_turns}")
     console.print()
 
     # Create game backend
@@ -477,6 +504,131 @@ def test(
     console.print("[bold]Running test...[/bold]")
     console.print("─" * 40)
 
+    # AI play mode - use GameSession with LLM
+    if ai:
+        try:
+            llm = create_llm_backend(llm_backend, config, model)
+        except Exception as e:
+            console.print(f"[red]Error creating LLM backend:[/red] {e}")
+            raise typer.Exit(ExitCode.GAME_START_FAILED) from None
+
+        app_config = load_config(Path(config) if config else None, game_path)
+        session = GameSession(backend, llm, app_config)  # type: ignore[arg-type]
+
+        # Set up transcript logger if requested
+        transcript_logger: TranscriptLogger | None = None
+        if transcript:
+            transcript.parent.mkdir(parents=True, exist_ok=True)
+            transcript_logger = TranscriptLogger(
+                json_path=None,
+                markdown_path=transcript,
+                game_title=game_path.stem,
+            )
+            console.print(f"  Transcript: {transcript}")
+
+        # Track state for assertions
+        final_location: str | None = None
+        final_output: str = ""
+        turns_played: int = 0
+
+        def on_game_output_ai(response: GameResponse) -> None:
+            nonlocal final_location, final_output
+            final_location = response.location
+            final_output = response.text
+            if transcript_logger:
+                transcript_logger.log_game_output(response.text, response.location)
+            if verbose:
+                if response.location:
+                    console.print(f"[dim]Location:[/dim] [cyan]{response.location}[/cyan]")
+                text = response.text
+                if len(text) > 300:
+                    text = text[:300] + "..."
+                console.print(f"[dim]{text}[/dim]")
+
+        def on_llm_response_ai(response: LLMResponse) -> None:
+            nonlocal turns_played
+            turns_played += 1
+            if transcript_logger:
+                transcript_logger.log_llm_response(
+                    response.raw_text,
+                    command=response.command,
+                    reasoning=response.reasoning,
+                )
+            if response.command:
+                console.print(f"[yellow]> {response.command}[/yellow]")
+
+        try:
+            import asyncio
+
+            game_result = asyncio.run(
+                session.run(
+                    game_path,
+                    max_turns=max_turns,
+                    on_game_output=on_game_output_ai,
+                    on_llm_response=on_llm_response_ai,
+                )
+            )
+
+            # Check final assertions
+            from gruebot.testing.runner import TestState
+
+            state = TestState(
+                current_location=final_location,
+                last_output=final_output,
+                turns=turns_played,
+            )
+
+            assertions_passed = 0
+            assertions_failed = 0
+            failed_results: list[str] = []
+
+            for assertion in final_assertions:
+                assertion_check = assertion.check(state)
+                if assertion_check.passed:
+                    assertions_passed += 1
+                    console.print(f"  [green]✓[/green] {assertion.describe()}")
+                else:
+                    assertions_failed += 1
+                    failed_results.append(assertion_check.message)
+                    console.print(f"  [red]✗[/red] {assertion_check.message}")
+
+            # Show results
+            console.print("─" * 40)
+            if assertions_failed == 0:
+                console.print("[bold green]✓ PASSED[/bold green]")
+            else:
+                console.print("[bold red]✗ FAILED[/bold red]")
+
+            console.print(f"  Turns: {turns_played}")
+            console.print(f"  Outcome: {game_result.outcome}")
+            if final_assertions:
+                console.print(f"  Assertions: {assertions_passed}/{len(final_assertions)} passed")
+
+            if game_result.error:
+                console.print(f"  [red]Error: {game_result.error}[/red]")
+
+            # Finalize transcript
+            if transcript_logger:
+                transcript_logger.finalize()
+                console.print(f"  Transcript saved: {transcript}")
+
+            exit_code = ExitCode.SUCCESS if assertions_failed == 0 else ExitCode.ASSERTION_FAILED
+            raise typer.Exit(exit_code)
+
+        except KeyboardInterrupt:
+            console.print("\n[yellow]Interrupted by user[/yellow]")
+            if transcript_logger:
+                transcript_logger.finalize()
+            raise typer.Exit(ExitCode.GAME_ERROR) from None
+        except typer.Exit:
+            raise
+        except Exception as e:
+            console.print(f"[red]Error during AI play: {e}[/red]")
+            if transcript_logger:
+                transcript_logger.finalize()
+            raise typer.Exit(ExitCode.GAME_ERROR) from None
+
+    # Walkthrough/smoke test mode - use TestRunner
     runner = TestRunner(
         backend=backend,
         config=test_config,

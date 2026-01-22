@@ -161,6 +161,26 @@ gruebot test game.z5 -w walkthrough.txt \
   --expect-text "gold"
 ```
 
+### AI Play Mode
+
+Let Claude play your game and check assertions (requires `ANTHROPIC_API_KEY`):
+
+```bash
+# Let Claude play for 100 turns, check final location
+gruebot test game.z5 --ai --max-turns 100 --expect-location "Treasure Room"
+
+# Save transcript for later analysis (by another LLM, reviewer, etc.)
+gruebot test game.z5 --ai --max-turns 50 --transcript playthrough.md
+
+# Use a specific model
+gruebot test game.z5 --ai -M claude-opus-4-20250514 --max-turns 100
+```
+
+This is useful for:
+- Regression testing: ensure game is completable
+- Difficulty testing: see how far Claude gets in N turns
+- Generating transcripts for human/LLM review
+
 ### Exit Codes
 
 | Code | Meaning |
@@ -182,17 +202,41 @@ name: Test IF Game
 on: [push, pull_request]
 
 jobs:
-  test:
+  # Walkthrough test (no API key needed)
+  walkthrough-test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Test with Gruebot
+      - name: Test with walkthrough
         run: |
           docker run --rm \
             -v ${{ github.workspace }}:/games \
             ghcr.io/tibbon/gruebot:latest \
             test /games/mygame.z8 --walkthrough /games/test-walkthrough.txt
+
+  # AI playthrough test (requires ANTHROPIC_API_KEY secret)
+  ai-test:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push'  # Only on push, not PRs (to save API costs)
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Let Claude play
+        run: |
+          docker run --rm \
+            -e ANTHROPIC_API_KEY=${{ secrets.ANTHROPIC_API_KEY }} \
+            -v ${{ github.workspace }}:/games \
+            ghcr.io/tibbon/gruebot:latest \
+            test /games/mygame.z8 --ai --max-turns 50 \
+            --transcript /games/playthrough.md \
+            --expect-location "Victory"
+
+      - name: Upload transcript
+        uses: actions/upload-artifact@v4
+        with:
+          name: playthrough-transcript
+          path: playthrough.md
 ```
 
 ## Development
