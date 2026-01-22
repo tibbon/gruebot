@@ -3,7 +3,7 @@
 # Build: docker build -t gruebot .
 # Run:   docker run -it -v /path/to/games:/games gruebot play /games/zork1.z5
 
-FROM python:3.12-slim
+FROM python:3.14-slim
 
 # Install build dependencies and frotz
 RUN apt-get update && apt-get install -y --no-install-recommends \
