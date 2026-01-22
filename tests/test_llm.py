@@ -310,8 +310,9 @@ class TestClaudeCLIBackend:
             ConversationTurn(role="assistant", content="COMMAND: north"),
         ]
 
-        prompt = backend._build_prompt(messages, "System prompt")
+        prompt = backend._build_prompt(messages)
 
-        assert "System prompt" in prompt
+        # System prompt is now passed separately to --system-prompt flag
         assert "Game output here" in prompt
         assert "COMMAND: north" in prompt
+        assert "Please provide your next command" in prompt

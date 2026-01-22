@@ -2,9 +2,7 @@
 
 import asyncio
 import shutil
-import tempfile
 from collections.abc import AsyncIterator
-from pathlib import Path
 
 from ifplayer.llm.prompts import (
     get_summarization_prompt,
@@ -73,11 +71,11 @@ class ClaudeCLIBackend:
         if system_prompt is None:
             system_prompt = get_system_prompt()
 
-        # Build the prompt content
-        prompt_content = self._build_prompt(messages, system_prompt)
+        # Build the prompt content (without system prompt, passed separately)
+        prompt_content = self._build_prompt(messages)
 
         # Run claude CLI
-        raw_text = await self._run_claude(prompt_content)
+        raw_text = await self._run_claude(prompt_content, system_prompt)
 
         # Parse the response
         parsed = parse_response(raw_text)
@@ -129,25 +127,23 @@ class ClaudeCLIBackend:
         history_text = self._format_history_for_summary(history)
 
         # Note: max_tokens is part of protocol but CLI doesn't support it directly
-        prompt = f"{system_prompt}\n\nPlease summarize this game session (keep it concise):\n\n{history_text}"
+        prompt = f"Please summarize this game session (keep it concise):\n\n{history_text}"
 
-        return await self._run_claude(prompt)
+        return await self._run_claude(prompt, system_prompt)
 
     def _build_prompt(
         self,
         messages: list[ConversationTurn],
-        system_prompt: str,
     ) -> str:
-        """Build the full prompt from messages.
+        """Build the conversation prompt from messages.
 
         Args:
             messages: Conversation history.
-            system_prompt: System prompt.
 
         Returns:
             Combined prompt string.
         """
-        parts = [system_prompt, ""]
+        parts = []
 
         for turn in messages:
             if turn.role == "user":
@@ -162,11 +158,14 @@ class ClaudeCLIBackend:
 
         return "\n".join(parts)
 
-    async def _run_claude(self, prompt: str) -> str:
+    async def _run_claude(
+        self, prompt: str, system_prompt: str | None = None
+    ) -> str:
         """Run the claude CLI with the given prompt.
 
         Args:
             prompt: The prompt to send.
+            system_prompt: Optional system prompt.
 
         Returns:
             Claude's response text.
@@ -174,42 +173,36 @@ class ClaudeCLIBackend:
         Raises:
             ClaudeCLIError: If the CLI fails.
         """
-        # Write prompt to temp file (safer for long prompts)
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
-            f.write(prompt)
-            prompt_file = Path(f.name)
+        # Build command
+        cmd = [self.claude_path, "--print"]
 
-        try:
-            # Build command
-            cmd = [self.claude_path, "--print"]
+        if self.model:
+            cmd.extend(["--model", self.model])
 
-            if self.model:
-                cmd.extend(["--model", self.model])
+        # Use --dangerously-skip-permissions for non-interactive use
+        cmd.append("--dangerously-skip-permissions")
 
-            # Use --dangerously-skip-permissions for non-interactive use
-            cmd.append("--dangerously-skip-permissions")
+        # Add system prompt if provided
+        if system_prompt:
+            cmd.extend(["--system-prompt", system_prompt])
 
-            # Read prompt from file
-            cmd.extend(["--input-file", str(prompt_file)])
+        # Add the prompt as the final argument
+        cmd.append(prompt)
 
-            # Run the command
-            process = await asyncio.create_subprocess_exec(
-                *cmd,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-            )
+        # Run the command
+        process = await asyncio.create_subprocess_exec(
+            *cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
 
-            stdout, stderr = await process.communicate()
+        stdout, stderr = await process.communicate()
 
-            if process.returncode != 0:
-                error_msg = stderr.decode("utf-8", errors="replace")
-                raise ClaudeCLIError(f"Claude CLI failed: {error_msg}")
+        if process.returncode != 0:
+            error_msg = stderr.decode("utf-8", errors="replace")
+            raise ClaudeCLIError(f"Claude CLI failed: {error_msg}")
 
-            return stdout.decode("utf-8", errors="replace").strip()
-
-        finally:
-            # Clean up temp file
-            prompt_file.unlink(missing_ok=True)
+        return stdout.decode("utf-8", errors="replace").strip()
 
     def _format_history_for_summary(self, history: list[ConversationTurn]) -> str:
         """Format conversation history for summarization.

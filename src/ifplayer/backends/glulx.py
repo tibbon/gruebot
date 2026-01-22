@@ -49,6 +49,7 @@ class GlulxBackend:
         self._current_location: str | None = None
         self._gen: int = 0  # Generation counter for remglk protocol
         self._input_window: int | None = None  # Window ID expecting input
+        self._windows: dict[int, dict[str, Any]] = {}  # Cached window info
 
     def start(self, game_path: str) -> GameResponse:
         """Start a Glulx game.
@@ -363,6 +364,12 @@ class GlulxBackend:
         if "gen" in update:
             self._gen = update["gen"]
 
+        # Cache window info (windows array only sent when they change)
+        for window in update.get("windows", []):
+            window_id = window.get("id")
+            if window_id is not None:
+                self._windows[window_id] = window
+
         # Find window expecting input
         self._input_window = None
         for input_req in update.get("input", []):
@@ -421,6 +428,9 @@ class GlulxBackend:
     def _find_window(self, update: dict[str, Any], window_id: int | None) -> dict[str, Any] | None:
         """Find window info by ID.
 
+        Uses cached window info since remglk only sends windows array
+        when windows change. Falls back to checking the update directly.
+
         Args:
             update: Parsed JSON update.
             window_id: Window ID to find.
@@ -430,11 +440,17 @@ class GlulxBackend:
         """
         if window_id is None:
             return None
+
+        # Check cache first
+        if window_id in self._windows:
+            return self._windows[window_id]
+
+        # Fallback: check the current update (for first call or tests)
         for window in update.get("windows", []):
             if window.get("id") == window_id:
-                # window is a dict from the JSON structure
                 result: dict[str, Any] = window
                 return result
+
         return None
 
     def _extract_location_from_update(self, update: dict[str, Any]) -> str | None:
