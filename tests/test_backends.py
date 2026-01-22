@@ -10,6 +10,7 @@ from ifplayer.backends.base import (
     InterpreterProcess,
     InterpreterStartError,
 )
+from ifplayer.backends.glulx import GlulxBackend
 from ifplayer.backends.protocol import GameState
 from ifplayer.backends.zmachine import ZMachineBackend
 
@@ -303,3 +304,309 @@ class TestZMachineBackendTextExtraction:
 
         assert cleaned == "Line 1\n\nLine 2\n\nLine 3"
         assert ">" not in cleaned
+
+
+def _json_to_lines(json_str: str) -> list[str]:
+    """Convert JSON string to list of lines for readline mock.
+
+    remglk outputs each JSON message as a single line followed by blank line.
+    """
+    lines = []
+    for line in json_str.split("\n"):
+        lines.append(line + "\n" if line else "\n")
+    return lines
+
+
+class TestGlulxBackend:
+    """Tests for GlulxBackend."""
+
+    def test_init_default_values(self) -> None:
+        """Test backend initializes with default values."""
+        backend = GlulxBackend()
+
+        assert backend.glulxe_path == "glulxe"
+        assert backend.save_directory == Path("./saves")
+        assert backend.screen_width == 80
+        assert backend.screen_height == 50
+        assert backend.is_running is False
+        assert backend.game_info is None
+
+    def test_init_custom_values(self) -> None:
+        """Test backend with custom values."""
+        backend = GlulxBackend(
+            glulxe_path="/custom/glulxe",
+            save_directory=Path("/custom/saves"),
+            screen_width=120,
+            screen_height=40,
+        )
+
+        assert backend.glulxe_path == "/custom/glulxe"
+        assert backend.save_directory == Path("/custom/saves")
+        assert backend.screen_width == 120
+        assert backend.screen_height == 40
+
+    def test_start_game_not_found(self) -> None:
+        """Test starting with non-existent game file."""
+        backend = GlulxBackend()
+
+        with pytest.raises(FileNotFoundError):
+            backend.start("/nonexistent/game.ulx")
+
+    @patch.object(InterpreterProcess, "start")
+    def test_start_success(self, mock_start: MagicMock) -> None:
+        """Test successful game start."""
+        with tempfile.NamedTemporaryFile(suffix=".ulx", delete=False) as f:
+            game_path = f.name
+
+        try:
+            # Mock the interpreter process with JSON output
+            mock_proc = MagicMock()
+            mock_proc.is_alive = True
+
+            # Simulate remglk JSON output (single line followed by blank line)
+            json_output = (
+                '{"type":"update","gen":1,"windows":['
+                '{"id":25,"type":"grid","rock":202,"gridwidth":80,"gridheight":1},'
+                '{"id":22,"type":"buffer","rock":201}'
+                '],"content":['
+                '{"id":25,"lines":[{"content":["West of House"]}]},'
+                '{"id":22,"text":[{"content":["Welcome to Adventure!\\n"]},'
+                '{"content":["You are standing in an open field west of a white house."]}]}'
+                '],"input":[{"id":22,"gen":1,"type":"line","maxlen":256}]}\n\n'
+            )
+
+            mock_proc.readline.side_effect = _json_to_lines(json_output)
+            mock_start.return_value = mock_proc
+
+            backend = GlulxBackend()
+            response = backend.start(game_path)
+
+            assert backend.is_running is True
+            assert backend.game_info is not None
+            assert backend.game_info.format == "glulx"
+            assert response.state == GameState.WAITING_INPUT
+        finally:
+            Path(game_path).unlink()
+
+    @patch.object(InterpreterProcess, "start")
+    def test_send_command(self, mock_start: MagicMock) -> None:
+        """Test sending a command."""
+        with tempfile.NamedTemporaryFile(suffix=".ulx", delete=False) as f:
+            game_path = f.name
+
+        try:
+            mock_proc = MagicMock()
+            mock_proc.is_alive = True
+
+            # Initial output
+            intro_json = (
+                '{"type":"update","gen":1,"windows":['
+                '{"id":22,"type":"buffer"}],'
+                '"content":[{"id":22,"text":[{"content":["Welcome!"]}]}],'
+                '"input":[{"id":22,"gen":1,"type":"line","maxlen":256}]}\n\n'
+            )
+
+            # Response after command
+            response_json = (
+                '{"type":"update","gen":2,"windows":['
+                '{"id":22,"type":"buffer"}],'
+                '"content":[{"id":22,"text":[{"content":["You go north.\\n"]},'
+                '{"content":["North Room\\nYou are in a northern room."]}]}],'
+                '"input":[{"id":22,"gen":2,"type":"line","maxlen":256}]}\n\n'
+            )
+
+            # Set up readline to return lines
+            all_output = intro_json + response_json
+            mock_proc.readline.side_effect = _json_to_lines(all_output)
+            mock_start.return_value = mock_proc
+
+            backend = GlulxBackend()
+            backend.start(game_path)
+
+            response = backend.send_command("go north")
+
+            assert "north" in response.text.lower()
+            mock_proc.write.assert_called()  # Check that JSON was sent
+        finally:
+            Path(game_path).unlink()
+
+    def test_send_command_not_running(self) -> None:
+        """Test sending command when no game running."""
+        backend = GlulxBackend()
+
+        with pytest.raises(RuntimeError, match="No game is currently running"):
+            backend.send_command("look")
+
+    @patch.object(InterpreterProcess, "start")
+    def test_detect_game_over(self, mock_start: MagicMock) -> None:
+        """Test detection of game over state."""
+        with tempfile.NamedTemporaryFile(suffix=".ulx", delete=False) as f:
+            game_path = f.name
+
+        try:
+            mock_proc = MagicMock()
+            mock_proc.is_alive = True
+
+            # Initial output
+            intro_json = (
+                '{"type":"update","gen":1,"windows":['
+                '{"id":22,"type":"buffer"}],'
+                '"content":[{"id":22,"text":[{"content":["Welcome!"]}]}],'
+                '"input":[{"id":22,"gen":1,"type":"line","maxlen":256}]}\n\n'
+            )
+
+            # Game over response (with exit flag)
+            game_over_json = (
+                '{"type":"update","gen":2,"windows":['
+                '{"id":22,"type":"buffer"}],'
+                '"content":[{"id":22,"text":[{"content":["*** You have died ***"]}]}],'
+                '"exit":true}\n\n'
+            )
+
+            all_output = intro_json + game_over_json
+            mock_proc.readline.side_effect = _json_to_lines(all_output)
+            mock_start.return_value = mock_proc
+
+            backend = GlulxBackend()
+            backend.start(game_path)
+
+            response = backend.send_command("jump off cliff")
+
+            assert response.state == GameState.GAME_OVER
+        finally:
+            Path(game_path).unlink()
+
+    @patch.object(InterpreterProcess, "start")
+    def test_quit(self, mock_start: MagicMock) -> None:
+        """Test quitting the game."""
+        with tempfile.NamedTemporaryFile(suffix=".ulx", delete=False) as f:
+            game_path = f.name
+
+        try:
+            mock_proc = MagicMock()
+            mock_proc.is_alive = True
+
+            intro_json = (
+                '{"type":"update","gen":1,"windows":['
+                '{"id":22,"type":"buffer"}],'
+                '"content":[{"id":22,"text":[{"content":["Welcome!"]}]}],'
+                '"input":[{"id":22,"gen":1,"type":"line","maxlen":256}]}\n\n'
+            )
+
+            mock_proc.readline.side_effect = _json_to_lines(intro_json)
+            mock_start.return_value = mock_proc
+
+            backend = GlulxBackend()
+            backend.start(game_path)
+
+            assert backend.is_running is True
+
+            mock_proc.is_alive = False
+            backend.quit()
+
+            mock_proc.terminate.assert_called_once()
+        finally:
+            Path(game_path).unlink()
+
+
+class TestGlulxBackendTextExtraction:
+    """Tests for Glulx text extraction methods."""
+
+    def test_extract_text_from_buffer(self) -> None:
+        """Test extracting text from buffer window."""
+        backend = GlulxBackend()
+
+        update = {
+            "windows": [{"id": 22, "type": "buffer"}],
+            "content": [
+                {
+                    "id": 22,
+                    "text": [
+                        {"content": ["Line 1\n"]},
+                        {"content": ["Line 2"]},
+                    ],
+                }
+            ],
+        }
+
+        text = backend._extract_text(update)
+
+        assert "Line 1" in text
+        assert "Line 2" in text
+
+    def test_extract_location_from_grid(self) -> None:
+        """Test extracting location from grid window."""
+        backend = GlulxBackend()
+
+        update = {
+            "windows": [
+                {"id": 25, "type": "grid"},
+                {"id": 22, "type": "buffer"},
+            ],
+            "content": [
+                {
+                    "id": 25,
+                    "lines": [{"content": ["West of House    Score: 0  Turns: 1"]}],
+                },
+            ],
+        }
+
+        location = backend._extract_location_from_update(update)
+
+        assert location == "West of House"
+
+    def test_detect_game_state_exit_flag(self) -> None:
+        """Test game over detection via exit flag."""
+        backend = GlulxBackend()
+
+        update = {"exit": True}
+        state = backend._detect_game_state_from_update(update, "")
+
+        assert state == GameState.GAME_OVER
+
+    def test_detect_game_state_no_input(self) -> None:
+        """Test game over detection when no input requested."""
+        backend = GlulxBackend()
+
+        update = {"input": []}
+        state = backend._detect_game_state_from_update(update, "")
+
+        assert state == GameState.GAME_OVER
+
+    def test_detect_game_state_pattern(self) -> None:
+        """Test game over detection via text pattern."""
+        backend = GlulxBackend()
+
+        update = {"input": [{"id": 22, "type": "line"}]}
+        state = backend._detect_game_state_from_update(
+            update, "*** You have died ***"
+        )
+
+        assert state == GameState.GAME_OVER
+
+    def test_clean_text(self) -> None:
+        """Test text cleaning."""
+        backend = GlulxBackend()
+
+        raw = "Line 1\n\n\nLine 2\n\nLine 3"
+        cleaned = backend._clean_text(raw)
+
+        assert cleaned == "Line 1\n\nLine 2\n\nLine 3"
+
+    def test_extract_title(self) -> None:
+        """Test extracting game title."""
+        backend = GlulxBackend()
+
+        intro = "Anchorhead\nby Michael Gentry\nRelease 5"
+        title = backend._extract_title(intro)
+
+        assert title == "Anchorhead"
+
+    def test_extract_author(self) -> None:
+        """Test extracting author."""
+        backend = GlulxBackend()
+
+        intro = "Adventure Game\nby John Smith\nRelease 1"
+        author = backend._extract_author(intro)
+
+        assert author == "John Smith"

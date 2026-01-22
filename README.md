@@ -18,9 +18,37 @@ pip install -e ".[dev]"
 
 ## External Dependencies
 
-- `dfrotz` - Z-Machine interpreter
-  - macOS: `brew install frotz`
-  - Linux: `apt install frotz`
+### Z-Machine (dfrotz)
+
+- macOS: `brew install frotz`
+- Linux: `apt install frotz`
+
+### Glulx (glulxe with remglk)
+
+glulxe must be built with remglk for JSON I/O support:
+
+```bash
+# Clone repositories
+git clone https://github.com/erkyrath/remglk.git
+git clone https://github.com/erkyrath/glulxe.git
+
+# Build remglk
+cd remglk
+make
+
+# Build glulxe with remglk
+cd ../glulxe
+make GLKINCLUDEDIR=../remglk GLKLIBDIR=../remglk GLKMAKEFILE=Make.remglk
+
+# Install (copy to PATH)
+sudo cp glulxe /usr/local/bin/
+```
+
+Alternatively on macOS with Homebrew:
+```bash
+# If a formula exists
+brew install glulxe --with-remglk
+```
 
 ## Usage
 
