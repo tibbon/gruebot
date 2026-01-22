@@ -20,6 +20,14 @@ from gruebot.llm.claude_cli import ClaudeCLIBackend
 from gruebot.llm.protocol import LLMResponse
 from gruebot.logging.transcript import TranscriptLogger, create_transcript_paths
 from gruebot.main import GameSession
+from gruebot.testing import (
+    Assertion,
+    ContainsTextAssertion,
+    LocationAssertion,
+    TestConfig,
+    TestRunner,
+)
+from gruebot.testing.runner import ExitCode, StepResult
 
 app = typer.Typer(
     name="gruebot",
@@ -330,6 +338,184 @@ def formats() -> None:
     console.print()
     console.print("[cyan]MUD[/cyan] (via telnet):")
     console.print("  Connect with: gruebot mud <host:port>")
+
+
+@app.command()
+def test(
+    game_path: Annotated[
+        Path,
+        typer.Argument(
+            help="Path to the game file (.z5, .z8, .ulx, .gblorb, etc.)",
+            exists=True,
+            dir_okay=False,
+        ),
+    ],
+    walkthrough: Annotated[
+        Path | None,
+        typer.Option(
+            "--walkthrough",
+            "-w",
+            help="Path to walkthrough file with commands and assertions",
+        ),
+    ] = None,
+    smoke: Annotated[
+        bool,
+        typer.Option("--smoke", "-s", help="Run smoke test (just verify game starts)"),
+    ] = False,
+    expect_location: Annotated[
+        str | None,
+        typer.Option("--expect-location", help="Assert final location contains this text"),
+    ] = None,
+    expect_text: Annotated[
+        str | None,
+        typer.Option("--expect-text", help="Assert final output contains this text"),
+    ] = None,
+    config: Annotated[
+        str | None,
+        typer.Option("--config", "-c", help="Path to config YAML file"),
+    ] = None,
+    game_backend: Annotated[
+        str,
+        typer.Option(
+            "--backend",
+            "-b",
+            help="Game backend: auto, zmachine, or glulx",
+        ),
+    ] = "auto",
+    dfrotz_path: Annotated[
+        str | None,
+        typer.Option("--dfrotz", help="Path to dfrotz executable"),
+    ] = None,
+    glulxe_path: Annotated[
+        str | None,
+        typer.Option("--glulxe", help="Path to glulxe executable"),
+    ] = None,
+    verbose: Annotated[
+        bool,
+        typer.Option("--verbose", "-v", help="Show detailed output"),
+    ] = False,
+) -> None:
+    """Test an interactive fiction game with walkthroughs or smoke tests.
+
+    Exit codes:
+      0 - All tests passed
+      1 - Game failed to start
+      2 - Assertion failed
+      3 - Game error during playthrough
+      4 - Invalid input (bad walkthrough file, etc.)
+      5 - Walkthrough execution error
+
+    Examples:
+      # Smoke test - verify game loads
+      gruebot test game.z5 --smoke
+
+      # Run walkthrough
+      gruebot test game.z5 --walkthrough walkthrough.txt
+
+      # With assertions
+      gruebot test game.z5 -w walkthrough.txt --expect-location "Treasure Room"
+    """
+    # Validate options
+    if not smoke and not walkthrough:
+        console.print("[red]Error:[/red] Must specify --smoke or --walkthrough")
+        raise typer.Exit(ExitCode.INVALID_INPUT)
+
+    # Determine game format
+    game_format = detect_game_format(game_path) if game_backend == "auto" else game_backend
+
+    console.print(f"[bold blue]Gruebot Test[/bold blue] - {game_path.name}")
+    console.print(f"  Backend: {game_format}")
+    if smoke:
+        console.print("  Mode: smoke test")
+    elif walkthrough:
+        console.print(f"  Mode: walkthrough ({walkthrough})")
+    console.print()
+
+    # Create game backend
+    try:
+        backend = create_game_backend(game_format, config, dfrotz_path, glulxe_path)
+    except Exception as e:
+        console.print(f"[red]Error creating game backend:[/red] {e}")
+        raise typer.Exit(ExitCode.GAME_START_FAILED) from None
+
+    # Build final assertions from CLI options
+    final_assertions: list[Assertion] = []
+    if expect_location:
+        final_assertions.append(LocationAssertion(expect_location))
+    if expect_text:
+        final_assertions.append(ContainsTextAssertion(expect_text))
+
+    # Create test config
+    test_config = TestConfig(
+        game_path=game_path,
+        walkthrough_path=walkthrough,
+        smoke_test=smoke,
+        verbose=verbose,
+        final_assertions=final_assertions,
+    )
+
+    # Callbacks for output
+    def on_step(result: StepResult) -> None:
+        if result.assertion_result:
+            if result.assertion_result.passed:
+                console.print(
+                    f"  [green]✓[/green] {result.step.assertion.describe()}"  # type: ignore[union-attr]
+                )
+            else:
+                console.print(f"  [red]✗[/red] {result.assertion_result.message}")
+        elif verbose and result.step.command:
+            console.print(f"  [dim]>[/dim] {result.step.command}")
+
+    def on_output(text: str) -> None:
+        if verbose:
+            # Truncate long output
+            if len(text) > 300:
+                text = text[:300] + "..."
+            console.print(f"[dim]{text}[/dim]")
+
+    # Run the test
+    console.print("[bold]Running test...[/bold]")
+    console.print("─" * 40)
+
+    runner = TestRunner(
+        backend=backend,
+        config=test_config,
+        on_step=on_step if not smoke else None,
+        on_output=on_output if verbose else None,
+    )
+    result = runner.run()
+
+    # Show results
+    console.print("─" * 40)
+    if result.passed:
+        console.print("[bold green]✓ PASSED[/bold green]")
+    else:
+        console.print("[bold red]✗ FAILED[/bold red]")
+
+    console.print(f"  Steps: {result.steps_executed}")
+    if result.assertions_checked > 0:
+        console.print(
+            f"  Assertions: {result.assertions_passed}/{result.assertions_checked} passed"
+        )
+
+    if result.error:
+        console.print(f"  [red]Error: {result.error}[/red]")
+
+    if result.failed_assertions and not verbose:
+        console.print()
+        console.print("[bold]Failed assertions:[/bold]")
+        for assertion_result in result.failed_assertions:
+            console.print(f"  [red]✗[/red] {assertion_result.message}")
+
+    if result.final_state and verbose:
+        console.print()
+        console.print("[bold]Final state:[/bold]")
+        console.print(f"  Location: {result.final_state.current_location or 'unknown'}")
+        console.print(f"  Turns: {result.final_state.turns}")
+        if result.final_state.score is not None:
+            console.print(f"  Score: {result.final_state.score}")
+
+    raise typer.Exit(result.exit_code)
 
 
 @app.command()

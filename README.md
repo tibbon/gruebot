@@ -8,9 +8,11 @@ LLM-powered interactive fiction player. Claude acts as the player of text advent
 
 - Z-Machine support via dfrotz (Infocom games, Inform 6/7 Z-code)
 - Glulx support via glulxe+remglk (modern Inform 7 games)
+- MUD support via telnet
 - Switchable LLM backends (Anthropic API or Claude CLI)
 - Full context management with periodic summarization
 - Dual transcript logging (JSON for replay, Markdown for reading)
+- **CI/CD testing** - Test IF games with walkthroughs and assertions (no API key required)
 
 ## Installation
 
@@ -107,6 +109,90 @@ gruebot play game.z5 --config config.yaml
 ```bash
 export IFPLAYER__LLM__MODEL=claude-opus-4-20250514
 gruebot play game.z5
+```
+
+## Testing IF Games (CI/CD)
+
+Gruebot includes a `test` command for automated testing of interactive fiction games. This is useful for IF authors who want to test their games in CI/CD pipelines - **no API key required**.
+
+### Smoke Test
+
+Verify a game loads and responds to input:
+
+```bash
+gruebot test game.z5 --smoke
+```
+
+### Walkthrough Test
+
+Run a sequence of commands from a file:
+
+```bash
+gruebot test game.z5 --walkthrough walkthrough.txt
+```
+
+### Walkthrough File Format
+
+```text
+# Comments start with #
+look
+north
+take lamp
+
+# Assertions check game state
+@expect-location "Kitchen"
+@expect-contains "brass lantern"
+@expect-not-contains "grue"
+@expect-inventory "lamp"
+@expect-score-gte 10
+@expect-turns-lte 50
+
+south
+@expect-location "Living Room"
+```
+
+### CLI Assertions
+
+Add assertions via command line:
+
+```bash
+gruebot test game.z5 -w walkthrough.txt \
+  --expect-location "Treasure Room" \
+  --expect-text "gold"
+```
+
+### Exit Codes
+
+| Code | Meaning |
+|------|---------|
+| 0 | All tests passed |
+| 1 | Game failed to start |
+| 2 | Assertion failed |
+| 3 | Game error during playthrough |
+| 4 | Invalid input (bad walkthrough file) |
+| 5 | Walkthrough execution error |
+
+### GitHub Actions Example
+
+Test your IF game on every push:
+
+```yaml
+name: Test IF Game
+
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Test with Gruebot
+        run: |
+          docker run --rm \
+            -v ${{ github.workspace }}:/games \
+            ghcr.io/tibbon/gruebot:latest \
+            test /games/mygame.z8 --walkthrough /games/test-walkthrough.txt
 ```
 
 ## Development
