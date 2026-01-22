@@ -1,0 +1,125 @@
+name: 'Gruebot IF Test'
+description: 'Test interactive fiction games with walkthroughs, smoke tests, or AI playthroughs'
+author: 'tibbon'
+branding:
+  icon: 'play-circle'
+  color: 'green'
+
+inputs:
+  game:
+    description: 'Path to the game file (.z5, .z8, .ulx, .gblorb, etc.)'
+    required: true
+  mode:
+    description: 'Test mode: smoke, walkthrough, or ai'
+    required: false
+    default: 'smoke'
+  walkthrough:
+    description: 'Path to walkthrough file (required for walkthrough mode)'
+    required: false
+  max-turns:
+    description: 'Maximum turns for AI mode'
+    required: false
+    default: '50'
+  expect-location:
+    description: 'Assert final location contains this text'
+    required: false
+  expect-text:
+    description: 'Assert final output contains this text'
+    required: false
+  transcript:
+    description: 'Path to save transcript (markdown format)'
+    required: false
+  model:
+    description: 'Model for AI mode (e.g., claude-sonnet-4-20250514)'
+    required: false
+  anthropic-api-key:
+    description: 'Anthropic API key (required for AI mode)'
+    required: false
+  verbose:
+    description: 'Show detailed output'
+    required: false
+    default: 'false'
+
+outputs:
+  exit-code:
+    description: 'Exit code from the test (0=success, 1=start failed, 2=assertion failed, 3=game error)'
+    value: ${{ steps.test.outputs.exit-code }}
+  transcript-path:
+    description: 'Path to the generated transcript (if requested)'
+    value: ${{ steps.test.outputs.transcript-path }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Validate inputs
+      shell: bash
+      run: |
+        if [[ "${{ inputs.mode }}" == "walkthrough" && -z "${{ inputs.walkthrough }}" ]]; then
+          echo "::error::Walkthrough mode requires 'walkthrough' input"
+          exit 1
+        fi
+        if [[ "${{ inputs.mode }}" == "ai" && -z "${{ inputs.anthropic-api-key }}" ]]; then
+          echo "::error::AI mode requires 'anthropic-api-key' input"
+          exit 1
+        fi
+
+    - name: Run Gruebot test
+      id: test
+      shell: bash
+      env:
+        ANTHROPIC_API_KEY: ${{ inputs.anthropic-api-key }}
+      run: |
+        # Build command arguments
+        ARGS="test ${{ inputs.game }}"
+
+        # Add mode-specific flags
+        if [[ "${{ inputs.mode }}" == "smoke" ]]; then
+          ARGS="$ARGS --smoke"
+        elif [[ "${{ inputs.mode }}" == "walkthrough" ]]; then
+          ARGS="$ARGS --walkthrough ${{ inputs.walkthrough }}"
+        elif [[ "${{ inputs.mode }}" == "ai" ]]; then
+          ARGS="$ARGS --ai --max-turns ${{ inputs.max-turns }}"
+          if [[ -n "${{ inputs.model }}" ]]; then
+            ARGS="$ARGS --model ${{ inputs.model }}"
+          fi
+        fi
+
+        # Add optional assertions
+        if [[ -n "${{ inputs.expect-location }}" ]]; then
+          ARGS="$ARGS --expect-location \"${{ inputs.expect-location }}\""
+        fi
+        if [[ -n "${{ inputs.expect-text }}" ]]; then
+          ARGS="$ARGS --expect-text \"${{ inputs.expect-text }}\""
+        fi
+
+        # Add transcript output
+        if [[ -n "${{ inputs.transcript }}" ]]; then
+          ARGS="$ARGS --transcript ${{ inputs.transcript }}"
+          echo "transcript-path=${{ inputs.transcript }}" >> $GITHUB_OUTPUT
+        fi
+
+        # Add verbose flag
+        if [[ "${{ inputs.verbose }}" == "true" ]]; then
+          ARGS="$ARGS --verbose"
+        fi
+
+        echo "Running: gruebot $ARGS"
+
+        # Run the test and capture exit code
+        set +e
+        docker run --rm \
+          -e ANTHROPIC_API_KEY \
+          -v "${{ github.workspace }}:/workspace" \
+          -w /workspace \
+          ghcr.io/tibbon/gruebot:latest \
+          $ARGS
+        EXIT_CODE=$?
+        set -e
+
+        echo "exit-code=$EXIT_CODE" >> $GITHUB_OUTPUT
+
+        # Fail the step if test failed
+        if [[ $EXIT_CODE -ne 0 ]]; then
+          echo "::error::Gruebot test failed with exit code $EXIT_CODE"
+          exit $EXIT_CODE
+        fi

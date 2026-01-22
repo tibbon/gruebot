@@ -192,9 +192,11 @@ This is useful for:
 | 4 | Invalid input (bad walkthrough file) |
 | 5 | Walkthrough execution error |
 
-### GitHub Actions Example
+### GitHub Action
 
-Test your IF game on every push:
+Gruebot provides a reusable GitHub Action for easy CI/CD integration. Add testing to your IF game with just a few lines:
+
+#### Basic Usage
 
 ```yaml
 name: Test IF Game
@@ -202,41 +204,91 @@ name: Test IF Game
 on: [push, pull_request]
 
 jobs:
-  # Walkthrough test (no API key needed)
-  walkthrough-test:
+  test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Test with walkthrough
-        run: |
-          docker run --rm \
-            -v ${{ github.workspace }}:/games \
-            ghcr.io/tibbon/gruebot:latest \
-            test /games/mygame.z8 --walkthrough /games/test-walkthrough.txt
+      # Smoke test - verify game loads
+      - name: Smoke test
+        uses: tibbon/gruebot@main
+        with:
+          game: ./mygame.z8
+          mode: smoke
 
-  # AI playthrough test (requires ANTHROPIC_API_KEY secret)
+      # Walkthrough test - run scripted commands
+      - name: Walkthrough test
+        uses: tibbon/gruebot@main
+        with:
+          game: ./mygame.z8
+          mode: walkthrough
+          walkthrough: ./tests/walkthrough.txt
+          expect-location: "Victory Room"
+```
+
+#### AI Playthrough
+
+Let Claude play your game and check if it can win:
+
+```yaml
   ai-test:
     runs-on: ubuntu-latest
-    if: github.event_name == 'push'  # Only on push, not PRs (to save API costs)
+    if: github.event_name == 'push'  # Save API costs on PRs
     steps:
       - uses: actions/checkout@v4
 
-      - name: Let Claude play
-        run: |
-          docker run --rm \
-            -e ANTHROPIC_API_KEY=${{ secrets.ANTHROPIC_API_KEY }} \
-            -v ${{ github.workspace }}:/games \
-            ghcr.io/tibbon/gruebot:latest \
-            test /games/mygame.z8 --ai --max-turns 50 \
-            --transcript /games/playthrough.md \
-            --expect-location "Victory"
+      - name: Claude playthrough
+        uses: tibbon/gruebot@main
+        with:
+          game: ./mygame.z8
+          mode: ai
+          max-turns: '100'
+          expect-location: "Treasure Room"
+          transcript: ./playthrough.md
+          anthropic-api-key: ${{ secrets.ANTHROPIC_API_KEY }}
 
       - name: Upload transcript
         uses: actions/upload-artifact@v4
+        if: always()
         with:
-          name: playthrough-transcript
-          path: playthrough.md
+          name: claude-playthrough
+          path: ./playthrough.md
+```
+
+#### Action Inputs
+
+| Input | Required | Default | Description |
+|-------|----------|---------|-------------|
+| `game` | Yes | - | Path to game file (.z5, .z8, .ulx, .gblorb) |
+| `mode` | No | `smoke` | Test mode: `smoke`, `walkthrough`, or `ai` |
+| `walkthrough` | For walkthrough | - | Path to walkthrough file |
+| `max-turns` | No | `50` | Maximum turns for AI mode |
+| `expect-location` | No | - | Assert final location contains text |
+| `expect-text` | No | - | Assert final output contains text |
+| `transcript` | No | - | Save transcript to this path |
+| `model` | No | - | Model for AI mode |
+| `anthropic-api-key` | For AI mode | - | Anthropic API key |
+| `verbose` | No | `false` | Show detailed output |
+
+#### Action Outputs
+
+| Output | Description |
+|--------|-------------|
+| `exit-code` | Test exit code (0=success) |
+| `transcript-path` | Path to generated transcript |
+
+#### Docker Alternative
+
+If you prefer using Docker directly:
+
+```yaml
+- name: Test with Docker
+  run: |
+    docker run --rm \
+      -v ${{ github.workspace }}:/workspace \
+      -w /workspace \
+      ghcr.io/tibbon/gruebot:latest \
+      test ./mygame.z8 --walkthrough ./tests/walkthrough.txt
 ```
 
 ## Development
