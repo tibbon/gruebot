@@ -50,7 +50,7 @@ class TranscriptLogger:
         # Keep file open for streaming writes during session
         if markdown_path:
             markdown_path.parent.mkdir(parents=True, exist_ok=True)
-            self._md_file = open(markdown_path, "w")  # noqa: SIM115
+            self._md_file = open(markdown_path, "w", encoding="utf-8")  # noqa: SIM115
             self._write_markdown_header()
 
     def _write_markdown_header(self) -> None:
@@ -158,7 +158,8 @@ class TranscriptLogger:
 
         if self._md_file:
             self._md_file.write(f"---\n\n*[Summary generated at turn {self._turn}]*\n\n")
-            self._md_file.write(f"> {summary.replace(chr(10), chr(10) + '> ')}\n\n")
+            quoted_summary = summary.replace("\n", "\n> ")
+            self._md_file.write(f"> {quoted_summary}\n\n")
             self._md_file.write("---\n\n")
             self._md_file.flush()
 
@@ -223,7 +224,7 @@ class TranscriptLogger:
         # Write JSON transcript
         if self.json_path:
             self.json_path.parent.mkdir(parents=True, exist_ok=True)
-            with open(self.json_path, "w") as f:
+            with open(self.json_path, "w", encoding="utf-8") as f:
                 json.dump(
                     {
                         "game_title": self.game_title,

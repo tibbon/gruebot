@@ -172,9 +172,7 @@ def play(
 ) -> None:
     """Play an interactive fiction game with an LLM as the player."""
     # Determine game format
-    game_format = (
-        detect_game_format(game_path) if game_backend == "auto" else game_backend
-    )
+    game_format = detect_game_format(game_path) if game_backend == "auto" else game_backend
 
     console.print(f"[bold blue]IF Player[/bold blue] - {game_path.name}")
     console.print(f"  Backend: {game_format}, LLM: {llm_backend}")

@@ -78,7 +78,7 @@ def load_config(
     if config_path and config_path.exists():
         import yaml
 
-        with open(config_path) as f:
+        with open(config_path, encoding="utf-8") as f:
             loaded = yaml.safe_load(f)
             if loaded:
                 config_data = loaded

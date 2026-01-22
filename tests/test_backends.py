@@ -578,9 +578,7 @@ class TestGlulxBackendTextExtraction:
         backend = GlulxBackend()
 
         update = {"input": [{"id": 22, "type": "line"}]}
-        state = backend._detect_game_state_from_update(
-            update, "*** You have died ***"
-        )
+        state = backend._detect_game_state_from_update(update, "*** You have died ***")
 
         assert state == GameState.GAME_OVER
 

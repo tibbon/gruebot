@@ -16,6 +16,10 @@ class ClaudeCLIError(Exception):
     """Error from Claude CLI."""
 
 
+class ClaudeCLIContextLimitError(ClaudeCLIError):
+    """Context/token limit exceeded in Claude CLI session."""
+
+
 class ClaudeCLIBackend:
     """LLM backend using the Claude Code CLI.
 
@@ -158,9 +162,7 @@ class ClaudeCLIBackend:
 
         return "\n".join(parts)
 
-    async def _run_claude(
-        self, prompt: str, system_prompt: str | None = None
-    ) -> str:
+    async def _run_claude(self, prompt: str, system_prompt: str | None = None) -> str:
         """Run the claude CLI with the given prompt.
 
         Args:
@@ -199,8 +201,43 @@ class ClaudeCLIBackend:
         stdout, stderr = await process.communicate()
 
         if process.returncode != 0:
-            error_msg = stderr.decode("utf-8", errors="replace")
-            raise ClaudeCLIError(f"Claude CLI failed: {error_msg}")
+            error_msg = stderr.decode("utf-8", errors="replace").strip()
+            stdout_msg = stdout.decode("utf-8", errors="replace").strip()
+
+            # Check for context/token limit errors
+            error_lower = error_msg.lower() + stdout_msg.lower()
+            if any(
+                phrase in error_lower
+                for phrase in [
+                    "context limit",
+                    "token limit",
+                    "context window",
+                    "maximum context",
+                    "too long",
+                    "exceeds the maximum",
+                    "context length",
+                ]
+            ):
+                raise ClaudeCLIContextLimitError(
+                    "Claude CLI session exceeded context limit. "
+                    "The conversation history is too long. "
+                    "Consider starting a new session or enabling summarization."
+                )
+
+            # Check for rate limit errors
+            if "rate limit" in error_lower or "too many requests" in error_lower:
+                raise ClaudeCLIError("Claude CLI rate limited. Please wait a moment and try again.")
+
+            # Check for authentication errors
+            if "auth" in error_lower or "api key" in error_lower or "unauthorized" in error_lower:
+                raise ClaudeCLIError(
+                    "Claude CLI authentication failed. "
+                    "Please check your Claude CLI is properly configured."
+                )
+
+            # Generic error with full context
+            full_error = error_msg or stdout_msg or "Unknown error"
+            raise ClaudeCLIError(f"Claude CLI failed: {full_error}")
 
         return stdout.decode("utf-8", errors="replace").strip()
 

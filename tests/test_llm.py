@@ -5,7 +5,11 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from ifplayer.llm.anthropic_api import AnthropicAPIBackend
-from ifplayer.llm.claude_cli import ClaudeCLIBackend, ClaudeCLIError
+from ifplayer.llm.claude_cli import (
+    ClaudeCLIBackend,
+    ClaudeCLIContextLimitError,
+    ClaudeCLIError,
+)
 from ifplayer.llm.prompts import (
     format_game_output,
     get_summarization_prompt,
@@ -299,6 +303,38 @@ class TestClaudeCLIBackend:
             messages = [ConversationTurn(role="user", content="Text")]
             with pytest.raises(ClaudeCLIError):
                 await backend.send(messages)
+
+    @pytest.mark.asyncio
+    async def test_send_context_limit_error(self) -> None:
+        """Test context limit error detection."""
+        with patch("shutil.which", return_value="/usr/bin/claude"):
+            backend = ClaudeCLIBackend()
+
+        mock_process = AsyncMock()
+        mock_process.returncode = 1
+        mock_process.communicate = AsyncMock(return_value=(b"", b"Error: context limit exceeded"))
+
+        with patch("asyncio.create_subprocess_exec", return_value=mock_process):
+            messages = [ConversationTurn(role="user", content="Text")]
+            with pytest.raises(ClaudeCLIContextLimitError) as exc_info:
+                await backend.send(messages)
+            assert "context limit" in str(exc_info.value).lower()
+
+    @pytest.mark.asyncio
+    async def test_send_rate_limit_error(self) -> None:
+        """Test rate limit error detection."""
+        with patch("shutil.which", return_value="/usr/bin/claude"):
+            backend = ClaudeCLIBackend()
+
+        mock_process = AsyncMock()
+        mock_process.returncode = 1
+        mock_process.communicate = AsyncMock(return_value=(b"", b"Error: rate limit exceeded"))
+
+        with patch("asyncio.create_subprocess_exec", return_value=mock_process):
+            messages = [ConversationTurn(role="user", content="Text")]
+            with pytest.raises(ClaudeCLIError) as exc_info:
+                await backend.send(messages)
+            assert "rate limit" in str(exc_info.value).lower()
 
     def test_build_prompt(self) -> None:
         """Test prompt building."""

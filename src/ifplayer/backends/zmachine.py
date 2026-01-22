@@ -110,6 +110,9 @@ class ZMachineBackend:
         # Read the response
         response_text = self._read_response()
 
+        # Strip echoed command from beginning of response
+        response_text = self._strip_command_echo(response_text, command)
+
         # Update current location if changed
         new_location = self._extract_location(response_text)
         if new_location:
@@ -261,6 +264,25 @@ class ZMachineBackend:
             prev_blank = is_blank
 
         return "\n".join(cleaned_lines)
+
+    def _strip_command_echo(self, text: str, command: str) -> str:
+        """Strip the echoed command from the beginning of text.
+
+        IF games typically echo the player's command back. This removes
+        that echo for cleaner output.
+
+        Args:
+            text: Response text that may contain echoed command.
+            command: The command that was sent.
+
+        Returns:
+            Text with echoed command stripped.
+        """
+        # Check if text starts with the command (case-insensitive)
+        if text.lower().startswith(command.lower()):
+            text = text[len(command) :].lstrip()
+
+        return text
 
     def _detect_game_state(self, text: str) -> GameState:
         """Detect the game state from response text.

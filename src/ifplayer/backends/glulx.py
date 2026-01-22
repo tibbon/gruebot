@@ -3,7 +3,7 @@
 import json
 import re
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from ifplayer.backends.base import (
     InterpreterCommunicationError,
@@ -146,6 +146,9 @@ class GlulxBackend:
         # Extract text from the update
         response_text = self._extract_text(update)
 
+        # Strip echoed command from beginning of response (common in IF games)
+        response_text = self._strip_command_echo(response_text, command)
+
         # Update location from grid window
         new_location = self._extract_location_from_update(update)
         if new_location:
@@ -189,7 +192,10 @@ class GlulxBackend:
         update = self._read_update()
 
         # Check if we got a file prompt
-        if "specialinput" in update and update.get("specialinput", {}).get("type") == "fileref_prompt":
+        if (
+            "specialinput" in update
+            and update.get("specialinput", {}).get("type") == "fileref_prompt"
+        ):
             # Provide the save filename
             save_file = str(self.save_directory / f"{slot}.glksave")
             fileref_msg = {
@@ -245,7 +251,10 @@ class GlulxBackend:
         update = self._read_update()
 
         # Check if we got a file prompt
-        if "specialinput" in update and update.get("specialinput", {}).get("type") == "fileref_prompt":
+        if (
+            "specialinput" in update
+            and update.get("specialinput", {}).get("type") == "fileref_prompt"
+        ):
             # Provide the save filename
             fileref_msg = {
                 "type": "specialresponse",
@@ -377,9 +386,7 @@ class GlulxBackend:
                 self._input_window = input_req["id"]
                 break
 
-        # update is already a dict from json.loads
-        result: dict[str, Any] = update
-        return result
+        return cast(dict[str, Any], update)
 
     def _extract_text(self, update: dict[str, Any]) -> str:
         """Extract readable text from a remglk update.
@@ -448,8 +455,7 @@ class GlulxBackend:
         # Fallback: check the current update (for first call or tests)
         for window in update.get("windows", []):
             if window.get("id") == window_id:
-                result: dict[str, Any] = window
-                return result
+                return cast(dict[str, Any], window)
 
         return None
 
@@ -488,9 +494,7 @@ class GlulxBackend:
                             return parts[0].strip()
         return None
 
-    def _detect_game_state_from_update(
-        self, update: dict[str, Any], text: str
-    ) -> GameState:
+    def _detect_game_state_from_update(self, update: dict[str, Any], text: str) -> GameState:
         """Detect game state from update and text.
 
         Args:
@@ -541,6 +545,29 @@ class GlulxBackend:
 
         # Strip leading/trailing whitespace
         return text.strip()
+
+    def _strip_command_echo(self, text: str, command: str) -> str:
+        """Strip the echoed command from the beginning of text.
+
+        IF games typically echo the player's command back. This removes
+        that echo for cleaner output.
+
+        Args:
+            text: Response text that may contain echoed command.
+            command: The command that was sent.
+
+        Returns:
+            Text with echoed command stripped.
+        """
+        # Check if text starts with the command (case-insensitive)
+        if text.lower().startswith(command.lower()):
+            text = text[len(command) :].lstrip()
+
+        # Also strip trailing prompt character (>)
+        if text.endswith(">"):
+            text = text[:-1].rstrip()
+
+        return text
 
     def _extract_title(self, intro_text: str) -> str | None:
         """Extract game title from introduction text.
