@@ -61,11 +61,52 @@ gruebot play path/to/game.z5
 # Play a Glulx game
 gruebot play path/to/game.ulx
 
+# Connect to a MUD server
+gruebot mud mud.example.com:4000
+
 # With configuration
 gruebot play path/to/game.z8 --config config.yaml --llm claude_cli
 
 # Show supported formats
 gruebot formats
+```
+
+## Model Configuration
+
+Gruebot defaults to Claude Sonnet. You can switch models in several ways:
+
+### CLI Option (recommended)
+
+```bash
+# Use Opus for more capable gameplay
+gruebot play game.z5 --model claude-opus-4-20250514
+
+# Use Sonnet (default)
+gruebot play game.z5 --model claude-sonnet-4-20250514
+```
+
+### Config File
+
+Create a `config.yaml`:
+
+```yaml
+llm:
+  model: claude-opus-4-20250514
+  max_tokens: 1024
+  temperature: 0.7
+```
+
+Then run with:
+
+```bash
+gruebot play game.z5 --config config.yaml
+```
+
+### Environment Variable
+
+```bash
+export IFPLAYER__LLM__MODEL=claude-opus-4-20250514
+gruebot play game.z5
 ```
 
 ## Development

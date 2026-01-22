@@ -94,26 +94,29 @@ def create_game_backend(
 def create_llm_backend(
     backend_type: str,
     config_path: str | None,
+    model_override: str | None = None,
 ) -> AnthropicAPIBackend | ClaudeCLIBackend:
     """Create the LLM backend.
 
     Args:
         backend_type: "anthropic_api" or "claude_cli"
         config_path: Optional config file path
+        model_override: Optional model name to override config
 
     Returns:
         LLM backend instance.
     """
     config = load_config(Path(config_path) if config_path else None)
+    model = model_override or config.llm.model
 
     if backend_type == "anthropic_api":
         return AnthropicAPIBackend(
-            model=config.llm.model,
+            model=model,
             max_tokens=config.llm.max_tokens,
             temperature=config.llm.temperature,
         )
     else:
-        return ClaudeCLIBackend()
+        return ClaudeCLIBackend(model=model)
 
 
 @app.command()
@@ -166,6 +169,14 @@ def play(
         str | None,
         typer.Option("--glulxe", help="Path to glulxe executable"),
     ] = None,
+    model: Annotated[
+        str | None,
+        typer.Option(
+            "--model",
+            "-M",
+            help="Model name (e.g., claude-sonnet-4-20250514, claude-opus-4-20250514)",
+        ),
+    ] = None,
     verbose: Annotated[
         bool,
         typer.Option("--verbose", "-v", help="Show detailed output"),
@@ -175,8 +186,11 @@ def play(
     # Determine game format
     game_format = detect_game_format(game_path) if game_backend == "auto" else game_backend
 
+    # Get display model name
+    display_model = model or "default"
+
     console.print(f"[bold blue]Gruebot[/bold blue] - {game_path.name}")
-    console.print(f"  Backend: {game_format}, LLM: {llm_backend}")
+    console.print(f"  Backend: {game_format}, LLM: {llm_backend}, Model: {display_model}")
     if max_turns:
         console.print(f"  Max turns: {max_turns}")
     console.print()
@@ -189,7 +203,7 @@ def play(
         raise typer.Exit(1) from None
 
     try:
-        llm = create_llm_backend(llm_backend, config)
+        llm = create_llm_backend(llm_backend, config, model)
     except Exception as e:
         console.print(f"[red]Error creating LLM backend:[/red] {e}")
         raise typer.Exit(1) from None
@@ -352,6 +366,14 @@ def mud(
         float,
         typer.Option("--timeout", help="Read timeout in seconds"),
     ] = 5.0,
+    model: Annotated[
+        str | None,
+        typer.Option(
+            "--model",
+            "-M",
+            help="Model name (e.g., claude-sonnet-4-20250514, claude-opus-4-20250514)",
+        ),
+    ] = None,
     verbose: Annotated[
         bool,
         typer.Option("--verbose", "-v", help="Show detailed output"),
@@ -370,8 +392,9 @@ def mud(
         host = address
         port = 23  # Default telnet port
 
+    display_model = model or "default"
     console.print(f"[bold blue]Gruebot[/bold blue] - MUD: {host}:{port}")
-    console.print(f"  LLM: {llm_backend}")
+    console.print(f"  LLM: {llm_backend}, Model: {display_model}")
     if max_turns:
         console.print(f"  Max turns: {max_turns}")
     console.print()
@@ -382,7 +405,7 @@ def mud(
 
     # Create LLM backend
     try:
-        llm = create_llm_backend(llm_backend, config)
+        llm = create_llm_backend(llm_backend, config, model)
     except Exception as e:
         console.print(f"[red]Error creating LLM backend:[/red] {e}")
         raise typer.Exit(1) from None
