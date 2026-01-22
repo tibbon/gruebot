@@ -1,33 +1,83 @@
 # Gruebot
 
+[![CI](https://github.com/tibbon/gruebot/actions/workflows/ci.yml/badge.svg)](https://github.com/tibbon/gruebot/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
+
 > *"It is pitch black. You are likely to be eaten by a grue."*
 
 LLM-powered interactive fiction player. Claude acts as the player of text adventure games, providing the light to navigate through the darkness.
 
+## Table of Contents
+
+- [Features](#features)
+- [Quick Start](#quick-start)
+- [Installation](#installation)
+- [Usage](#usage)
+- [Model Configuration](#model-configuration)
+- [Testing IF Games (CI/CD)](#testing-if-games-cicd)
+- [GitHub Action](#github-action)
+- [Development](#development)
+- [Why "Gruebot"?](#why-gruebot)
+- [License](#license)
+
 ## Features
 
-- Z-Machine support via dfrotz (Infocom games, Inform 6/7 Z-code)
-- Glulx support via glulxe+remglk (modern Inform 7 games)
-- MUD support via telnet
-- Switchable LLM backends (Anthropic API or Claude CLI)
+**Game Format Support:**
+- Z-Machine via dfrotz (Infocom games, Inform 6/7 Z-code: .z3, .z5, .z8)
+- Glulx via glulxe+remglk (modern Inform 7 games: .ulx, .gblorb)
+- MUD servers via telnet
+
+**LLM Integration:**
+- Switchable backends (Anthropic API or Claude CLI)
 - Full context management with periodic summarization
+- Configurable models (Sonnet, Opus)
+
+**Logging & Testing:**
 - Dual transcript logging (JSON for replay, Markdown for reading)
-- **CI/CD testing** - Test IF games with walkthroughs and assertions (no API key required)
+- CI/CD testing with walkthroughs and assertions
+- Smoke tests, walkthrough tests, and AI playthroughs
+
+## Quick Start
+
+```bash
+# Install
+pip install -e ".[dev]"
+
+# Set your API key
+export ANTHROPIC_API_KEY=your-key-here
+
+# Play a game
+gruebot play path/to/game.z5
+```
 
 ## Installation
+
+### Requirements
+
+- Python 3.11 or higher
+- `ANTHROPIC_API_KEY` environment variable (for play mode)
+- Game interpreter: dfrotz (Z-Machine) or glulxe (Glulx)
+
+### Install Gruebot
 
 ```bash
 pip install -e ".[dev]"
 ```
 
-## External Dependencies
+### Install Game Interpreters
 
-### Z-Machine (dfrotz)
+#### Z-Machine (dfrotz)
 
-- macOS: `brew install frotz`
-- Linux: `apt install frotz`
+```bash
+# macOS
+brew install frotz
 
-### Glulx (glulxe with remglk)
+# Linux (Debian/Ubuntu)
+apt install frotz
+```
+
+#### Glulx (glulxe with remglk)
 
 glulxe must be built with remglk for JSON I/O support:
 
@@ -37,21 +87,14 @@ git clone https://github.com/erkyrath/remglk.git
 git clone https://github.com/erkyrath/glulxe.git
 
 # Build remglk
-cd remglk
-make
+cd remglk && make
 
 # Build glulxe with remglk
 cd ../glulxe
 make GLKINCLUDEDIR=../remglk GLKLIBDIR=../remglk GLKMAKEFILE=Make.remglk
 
-# Install (copy to PATH)
+# Install
 sudo cp glulxe /usr/local/bin/
-```
-
-Alternatively on macOS with Homebrew:
-```bash
-# If a formula exists
-brew install glulxe --with-remglk
 ```
 
 ## Usage
@@ -66,7 +109,7 @@ gruebot play path/to/game.ulx
 # Connect to a MUD server
 gruebot mud mud.example.com:4000
 
-# With configuration
+# With configuration file
 gruebot play path/to/game.z8 --config config.yaml --llm claude_cli
 
 # Show supported formats
@@ -77,7 +120,7 @@ gruebot formats
 
 Gruebot defaults to Claude Sonnet. You can switch models in several ways:
 
-### CLI Option (recommended)
+### CLI Option (Recommended)
 
 ```bash
 # Use Opus for more capable gameplay
@@ -107,17 +150,17 @@ gruebot play game.z5 --config config.yaml
 ### Environment Variable
 
 ```bash
-export IFPLAYER__LLM__MODEL=claude-opus-4-20250514
+export GRUEBOT_LLM__MODEL=claude-opus-4-20250514
 gruebot play game.z5
 ```
 
 ## Testing IF Games (CI/CD)
 
-Gruebot includes a `test` command for automated testing of interactive fiction games. This is useful for IF authors who want to test their games in CI/CD pipelines - **no API key required**.
+Gruebot includes a `test` command for automated testing of interactive fiction games. This is useful for IF authors who want to test their games in CI/CD pipelines.
 
 ### Smoke Test
 
-Verify a game loads and responds to input:
+Verify a game loads and responds to input (**no API key required**):
 
 ```bash
 gruebot test game.z5 --smoke
@@ -125,7 +168,7 @@ gruebot test game.z5 --smoke
 
 ### Walkthrough Test
 
-Run a sequence of commands from a file:
+Run a sequence of commands from a file (**no API key required**):
 
 ```bash
 gruebot test game.z5 --walkthrough walkthrough.txt
@@ -163,13 +206,13 @@ gruebot test game.z5 -w walkthrough.txt \
 
 ### AI Play Mode
 
-Let Claude play your game and check assertions (requires `ANTHROPIC_API_KEY`):
+Let Claude play your game autonomously (**requires `ANTHROPIC_API_KEY`**):
 
 ```bash
 # Let Claude play for 100 turns, check final location
 gruebot test game.z5 --ai --max-turns 100 --expect-location "Treasure Room"
 
-# Save transcript for later analysis (by another LLM, reviewer, etc.)
+# Save transcript for later analysis
 gruebot test game.z5 --ai --max-turns 50 --transcript playthrough.md
 
 # Use a specific model
@@ -177,9 +220,9 @@ gruebot test game.z5 --ai -M claude-opus-4-20250514 --max-turns 100
 ```
 
 This is useful for:
-- Regression testing: ensure game is completable
-- Difficulty testing: see how far Claude gets in N turns
-- Generating transcripts for human/LLM review
+- **Regression testing:** ensure game is completable
+- **Difficulty testing:** see how far Claude gets in N turns
+- **Generating transcripts:** for human or LLM review
 
 ### Exit Codes
 
@@ -192,11 +235,11 @@ This is useful for:
 | 4 | Invalid input (bad walkthrough file) |
 | 5 | Walkthrough execution error |
 
-### GitHub Action
+## GitHub Action
 
-Gruebot provides a reusable GitHub Action for easy CI/CD integration. Add testing to your IF game with just a few lines:
+Gruebot provides a reusable GitHub Action for easy CI/CD integration.
 
-#### Basic Usage
+### Basic Usage
 
 ```yaml
 name: Test IF Game
@@ -211,14 +254,14 @@ jobs:
 
       # Smoke test - verify game loads
       - name: Smoke test
-        uses: tibbon/gruebot@main
+        uses: tibbon/gruebot@v1
         with:
           game: ./mygame.z8
           mode: smoke
 
       # Walkthrough test - run scripted commands
       - name: Walkthrough test
-        uses: tibbon/gruebot@main
+        uses: tibbon/gruebot@v1
         with:
           game: ./mygame.z8
           mode: walkthrough
@@ -226,7 +269,7 @@ jobs:
           expect-location: "Victory Room"
 ```
 
-#### AI Playthrough
+### AI Playthrough
 
 Let Claude play your game and check if it can win:
 
@@ -238,7 +281,7 @@ Let Claude play your game and check if it can win:
       - uses: actions/checkout@v4
 
       - name: Claude playthrough
-        uses: tibbon/gruebot@main
+        uses: tibbon/gruebot@v1
         with:
           game: ./mygame.z8
           mode: ai
@@ -255,7 +298,7 @@ Let Claude play your game and check if it can win:
           path: ./playthrough.md
 ```
 
-#### Action Inputs
+### Action Inputs
 
 | Input | Required | Default | Description |
 |-------|----------|---------|-------------|
@@ -270,14 +313,14 @@ Let Claude play your game and check if it can win:
 | `anthropic-api-key` | For AI mode | - | Anthropic API key |
 | `verbose` | No | `false` | Show detailed output |
 
-#### Action Outputs
+### Action Outputs
 
 | Output | Description |
 |--------|-------------|
 | `exit-code` | Test exit code (0=success) |
 | `transcript-path` | Path to generated transcript |
 
-#### Docker Alternative
+### Docker Alternative
 
 If you prefer using Docker directly:
 

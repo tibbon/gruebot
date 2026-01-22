@@ -1,4 +1,4 @@
-"""Configuration management for IF Player."""
+"""Configuration management for Gruebot."""
 
 from pathlib import Path
 from typing import Any, Literal
@@ -45,7 +45,7 @@ class Config(BaseSettings):
     """Main application configuration."""
 
     model_config = SettingsConfigDict(
-        env_prefix="IFPLAYER_",
+        env_prefix="GRUEBOT_",
         env_nested_delimiter="__",
     )
 
