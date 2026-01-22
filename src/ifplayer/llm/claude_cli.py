@@ -53,9 +53,7 @@ class ClaudeCLIBackend:
         """
         path = shutil.which("claude")
         if path is None:
-            raise ClaudeCLIError(
-                "Claude CLI not found. Install it from https://claude.ai/code"
-            )
+            raise ClaudeCLIError("Claude CLI not found. Install it from https://claude.ai/code")
         return path
 
     async def send(
@@ -177,9 +175,7 @@ class ClaudeCLIBackend:
             ClaudeCLIError: If the CLI fails.
         """
         # Write prompt to temp file (safer for long prompts)
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".txt", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
             f.write(prompt)
             prompt_file = Path(f.name)
 

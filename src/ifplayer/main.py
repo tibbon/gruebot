@@ -187,7 +187,9 @@ class GameSession:
                         )
 
             return GameResult(
-                outcome="max_turns" if self._turn_count >= (max_turns or float("inf")) else "stopped",
+                outcome="max_turns"
+                if self._turn_count >= (max_turns or float("inf"))
+                else "stopped",
                 turns=self._turn_count,
                 final_location=self.context.context.current_location,
             )

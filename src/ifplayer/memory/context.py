@@ -141,9 +141,7 @@ class ContextManager:
         """Trim history without summarization."""
         if len(self.context.recent_turns) > self.max_recent_turns:
             # Simple trim: keep the most recent turns
-            self.context.recent_turns = self.context.recent_turns[
-                -self.max_recent_turns :
-            ]
+            self.context.recent_turns = self.context.recent_turns[-self.max_recent_turns :]
 
     def build_messages(self) -> list[ConversationTurn]:
         """Build message list for LLM with summary + recent turns.

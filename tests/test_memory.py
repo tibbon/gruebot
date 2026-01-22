@@ -323,9 +323,7 @@ class TestSummarizer:
         """Test splitting turns."""
         summarizer = Summarizer(SummarizationConfig(keep_recent=2))
 
-        turns = [
-            ConversationTurn(role="user", content=f"Turn {i}") for i in range(5)
-        ]
+        turns = [ConversationTurn(role="user", content=f"Turn {i}") for i in range(5)]
 
         to_summarize, to_keep = summarizer.split_for_summarization(turns)
 
