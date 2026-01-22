@@ -16,6 +16,7 @@ from gruebot.testing.runner import (
     TestRunner,
     WalkthroughTest,
 )
+from gruebot.testing.types import TestState
 
 __all__ = [
     "Assertion",
@@ -28,6 +29,7 @@ __all__ = [
     "TestConfig",
     "TestResult",
     "TestRunner",
+    "TestState",
     "WalkthroughTest",
     "parse_assertion",
 ]

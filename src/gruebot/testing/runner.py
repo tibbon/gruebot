@@ -11,6 +11,7 @@ from pathlib import Path
 
 from gruebot.backends.protocol import GameBackend, GameResponse, GameState
 from gruebot.testing.assertions import Assertion, AssertionResult, parse_assertion
+from gruebot.testing.types import TestState
 
 
 class ExitCode(IntEnum):
@@ -22,20 +23,6 @@ class ExitCode(IntEnum):
     GAME_ERROR = 3
     INVALID_INPUT = 4
     WALKTHROUGH_ERROR = 5
-
-
-@dataclass
-class TestState:
-    """Current state during test execution."""
-
-    current_location: str | None = None
-    last_output: str = ""
-    full_transcript: list[str] = field(default_factory=list)
-    inventory: list[str] = field(default_factory=list)
-    score: int | None = None
-    turns: int = 0
-    game_over: bool = False
-    error: str | None = None
 
 
 @dataclass

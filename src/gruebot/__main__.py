@@ -558,8 +558,6 @@ def test(
                 console.print(f"[yellow]> {response.command}[/yellow]")
 
         try:
-            import asyncio
-
             game_result = asyncio.run(
                 session.run(
                     game_path,
@@ -570,7 +568,7 @@ def test(
             )
 
             # Check final assertions
-            from gruebot.testing.runner import TestState
+            from gruebot.testing.types import TestState
 
             state = TestState(
                 current_location=final_location,

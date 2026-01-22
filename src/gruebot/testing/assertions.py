@@ -5,10 +5,8 @@ from __future__ import annotations
 import re
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
 
-if TYPE_CHECKING:
-    from gruebot.testing.runner import TestState
+from gruebot.testing.types import TestState
 
 
 @dataclass
