@@ -1,6 +1,8 @@
-# IF Player
+# Gruebot
 
-LLM-powered interactive fiction player. Claude acts as the player of text adventure games.
+> *"It is pitch black. You are likely to be eaten by a grue."*
+
+LLM-powered interactive fiction player. Claude acts as the player of text adventure games, providing the light to navigate through the darkness.
 
 ## Features
 
@@ -54,10 +56,16 @@ brew install glulxe --with-remglk
 
 ```bash
 # Play a Z-Machine game
-ifplayer play path/to/game.z5
+gruebot play path/to/game.z5
+
+# Play a Glulx game
+gruebot play path/to/game.ulx
 
 # With configuration
-ifplayer play path/to/game.z8 --config config.yaml --llm anthropic_api
+gruebot play path/to/game.z8 --config config.yaml --llm claude_cli
+
+# Show supported formats
+gruebot formats
 ```
 
 ## Development
@@ -76,6 +84,10 @@ mypy src/
 # Run tests
 pytest tests/ -v
 ```
+
+## Why "Gruebot"?
+
+The [grue](https://zork.fandom.com/wiki/Grue) is the iconic monster from Zork that lurks in dark places, waiting to devour adventurers who venture without a light source. Gruebot is the light - an LLM companion that illuminates the path through text adventures, preventing you from stumbling in the dark.
 
 ## License
 

@@ -4,12 +4,12 @@ from collections.abc import AsyncIterator
 
 import anthropic
 
-from ifplayer.llm.prompts import (
+from gruebot.llm.prompts import (
     get_summarization_prompt,
     get_system_prompt,
     parse_response,
 )
-from ifplayer.llm.protocol import ConversationTurn, LLMResponse
+from gruebot.llm.protocol import ConversationTurn, LLMResponse
 
 
 class AnthropicAPIBackend:

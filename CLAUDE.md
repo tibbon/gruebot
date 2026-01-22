@@ -1,11 +1,11 @@
-# IF Player
+# Gruebot
 
 LLM-powered interactive fiction player. Claude acts as the player of text adventure games.
 
 ## Project Structure
 
 ```
-src/ifplayer/
+src/gruebot/
 ├── backends/     # Game interpreters (dfrotz for Z-Machine, glulxe+remglk for Glulx)
 ├── llm/          # LLM interfaces (Anthropic API, Claude CLI)
 ├── memory/       # Context management and summarization

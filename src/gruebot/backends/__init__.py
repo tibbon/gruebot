@@ -1,14 +1,14 @@
 """Game interpreter backends."""
 
-from ifplayer.backends.base import (
+from gruebot.backends.base import (
     InterpreterCommunicationError,
     InterpreterError,
     InterpreterProcess,
     InterpreterStartError,
 )
-from ifplayer.backends.glulx import GlulxBackend
-from ifplayer.backends.protocol import GameBackend, GameInfo, GameResponse, GameState
-from ifplayer.backends.zmachine import ZMachineBackend
+from gruebot.backends.glulx import GlulxBackend
+from gruebot.backends.protocol import GameBackend, GameInfo, GameResponse, GameState
+from gruebot.backends.zmachine import ZMachineBackend
 
 __all__ = [
     "GameBackend",

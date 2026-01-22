@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 import yaml
 
-from ifplayer.config import Config, GameConfig, LLMConfig, load_config
+from gruebot.config import Config, GameConfig, LLMConfig, load_config
 
 
 class TestConfig:

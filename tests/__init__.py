@@ -1,1 +1,1 @@
-"""Tests for ifplayer."""
+"""Tests for gruebot."""

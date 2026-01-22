@@ -4,7 +4,7 @@ import json
 import tempfile
 from pathlib import Path
 
-from ifplayer.logging.transcript import (
+from gruebot.logging.transcript import (
     TranscriptEntry,
     TranscriptLogger,
     create_transcript_paths,

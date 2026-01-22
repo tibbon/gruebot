@@ -1,6 +1,6 @@
 """Transcript logging."""
 
-from ifplayer.logging.transcript import (
+from gruebot.logging.transcript import (
     TranscriptEntry,
     TranscriptLogger,
     create_transcript_paths,

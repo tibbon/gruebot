@@ -3,11 +3,11 @@
 import re
 from pathlib import Path
 
-from ifplayer.backends.base import (
+from gruebot.backends.base import (
     InterpreterCommunicationError,
     InterpreterProcess,
 )
-from ifplayer.backends.protocol import GameInfo, GameResponse, GameState
+from gruebot.backends.protocol import GameInfo, GameResponse, GameState
 
 
 class ZMachineBackend:

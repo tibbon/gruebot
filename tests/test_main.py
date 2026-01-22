@@ -5,10 +5,10 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from ifplayer.backends.protocol import GameInfo, GameResponse, GameState
-from ifplayer.config import Config
-from ifplayer.llm.protocol import LLMResponse
-from ifplayer.main import GameResult, GameSession, StuckDetector
+from gruebot.backends.protocol import GameInfo, GameResponse, GameState
+from gruebot.config import Config
+from gruebot.llm.protocol import LLMResponse
+from gruebot.main import GameResult, GameSession, StuckDetector
 
 
 class TestStuckDetector:

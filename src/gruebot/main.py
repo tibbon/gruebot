@@ -5,11 +5,11 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from ifplayer.backends.protocol import GameBackend, GameResponse, GameState
-from ifplayer.config import Config
-from ifplayer.llm.prompts import format_game_output, get_system_prompt
-from ifplayer.llm.protocol import LLMInterface, LLMResponse
-from ifplayer.memory.context import ContextManager
+from gruebot.backends.protocol import GameBackend, GameResponse, GameState
+from gruebot.config import Config
+from gruebot.llm.prompts import format_game_output, get_system_prompt
+from gruebot.llm.protocol import LLMInterface, LLMResponse
+from gruebot.memory.context import ContextManager
 
 # Type aliases for callbacks
 OutputCallback = Callable[[GameResponse], None]

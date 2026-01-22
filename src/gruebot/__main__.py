@@ -1,4 +1,4 @@
-"""Entry point for ifplayer CLI."""
+"""Entry point for gruebot CLI."""
 
 import asyncio
 from pathlib import Path
@@ -9,19 +9,19 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.text import Text
 
-from ifplayer import __version__
-from ifplayer.backends.glulx import GlulxBackend
-from ifplayer.backends.protocol import GameResponse
-from ifplayer.backends.zmachine import ZMachineBackend
-from ifplayer.config import load_config
-from ifplayer.llm.anthropic_api import AnthropicAPIBackend
-from ifplayer.llm.claude_cli import ClaudeCLIBackend
-from ifplayer.llm.protocol import LLMResponse
-from ifplayer.logging.transcript import TranscriptLogger, create_transcript_paths
-from ifplayer.main import GameSession
+from gruebot import __version__
+from gruebot.backends.glulx import GlulxBackend
+from gruebot.backends.protocol import GameResponse
+from gruebot.backends.zmachine import ZMachineBackend
+from gruebot.config import load_config
+from gruebot.llm.anthropic_api import AnthropicAPIBackend
+from gruebot.llm.claude_cli import ClaudeCLIBackend
+from gruebot.llm.protocol import LLMResponse
+from gruebot.logging.transcript import TranscriptLogger, create_transcript_paths
+from gruebot.main import GameSession
 
 app = typer.Typer(
-    name="ifplayer",
+    name="gruebot",
     help="LLM-powered interactive fiction player",
 )
 console = Console()
@@ -174,7 +174,7 @@ def play(
     # Determine game format
     game_format = detect_game_format(game_path) if game_backend == "auto" else game_backend
 
-    console.print(f"[bold blue]IF Player[/bold blue] - {game_path.name}")
+    console.print(f"[bold blue]Gruebot[/bold blue] - {game_path.name}")
     console.print(f"  Backend: {game_format}, LLM: {llm_backend}")
     if max_turns:
         console.print(f"  Max turns: {max_turns}")
@@ -299,7 +299,7 @@ def play(
 @app.command()
 def version() -> None:
     """Show version information."""
-    console.print(f"[bold]ifplayer[/bold] {__version__}")
+    console.print(f"[bold]gruebot[/bold] {__version__}")
 
 
 @app.command()

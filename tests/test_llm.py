@@ -4,19 +4,19 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from ifplayer.llm.anthropic_api import AnthropicAPIBackend
-from ifplayer.llm.claude_cli import (
+from gruebot.llm.anthropic_api import AnthropicAPIBackend
+from gruebot.llm.claude_cli import (
     ClaudeCLIBackend,
     ClaudeCLIContextLimitError,
     ClaudeCLIError,
 )
-from ifplayer.llm.prompts import (
+from gruebot.llm.prompts import (
     format_game_output,
     get_summarization_prompt,
     get_system_prompt,
     parse_response,
 )
-from ifplayer.llm.protocol import ConversationTurn
+from gruebot.llm.protocol import ConversationTurn
 
 
 class TestPrompts:

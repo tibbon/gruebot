@@ -3,16 +3,16 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "ifplayer"
+name = "gruebot"
 version = "0.1.0"
-description = "LLM-powered interactive fiction player"
+description = "LLM-powered interactive fiction player - don't get eaten by a grue"
 readme = "README.md"
 requires-python = ">=3.11"
 license = "MIT"
 authors = [
     { name = "David Fisher" }
 ]
-keywords = ["interactive-fiction", "text-adventure", "llm", "claude", "z-machine", "glulx"]
+keywords = ["interactive-fiction", "text-adventure", "llm", "claude", "z-machine", "glulx", "grue", "zork"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Programming Language :: Python :: 3.11",
@@ -39,10 +39,10 @@ dev = [
 ]
 
 [project.scripts]
-ifplayer = "ifplayer.__main__:main"
+gruebot = "gruebot.__main__:main"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/ifplayer"]
+packages = ["src/gruebot"]
 
 [tool.ruff]
 target-version = "py311"
@@ -66,7 +66,7 @@ ignore = [
 ]
 
 [tool.ruff.lint.isort]
-known-first-party = ["ifplayer"]
+known-first-party = ["gruebot"]
 
 [tool.mypy]
 python_version = "3.11"

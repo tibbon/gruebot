@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass, field
 
-from ifplayer.llm.protocol import ConversationTurn, LLMInterface
+from gruebot.llm.protocol import ConversationTurn, LLMInterface
 
 
 @dataclass

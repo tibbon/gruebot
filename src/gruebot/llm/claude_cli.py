@@ -4,12 +4,12 @@ import asyncio
 import shutil
 from collections.abc import AsyncIterator
 
-from ifplayer.llm.prompts import (
+from gruebot.llm.prompts import (
     get_summarization_prompt,
     get_system_prompt,
     parse_response,
 )
-from ifplayer.llm.protocol import ConversationTurn, LLMResponse
+from gruebot.llm.protocol import ConversationTurn, LLMResponse
 
 
 class ClaudeCLIError(Exception):

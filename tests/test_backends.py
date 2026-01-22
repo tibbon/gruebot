@@ -6,13 +6,13 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from ifplayer.backends.base import (
+from gruebot.backends.base import (
     InterpreterProcess,
     InterpreterStartError,
 )
-from ifplayer.backends.glulx import GlulxBackend
-from ifplayer.backends.protocol import GameState
-from ifplayer.backends.zmachine import ZMachineBackend
+from gruebot.backends.glulx import GlulxBackend
+from gruebot.backends.protocol import GameState
+from gruebot.backends.zmachine import ZMachineBackend
 
 
 class TestInterpreterProcess:

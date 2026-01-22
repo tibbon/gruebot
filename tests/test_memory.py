@@ -4,9 +4,9 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from ifplayer.llm.protocol import ConversationTurn
-from ifplayer.memory.context import ContextManager, GameContext
-from ifplayer.memory.summarizer import (
+from gruebot.llm.protocol import ConversationTurn
+from gruebot.memory.context import ContextManager, GameContext
+from gruebot.memory.summarizer import (
     SummarizationConfig,
     Summarizer,
     create_summary_message,
