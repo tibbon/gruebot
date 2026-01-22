@@ -1,0 +1,51 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv
+venv/
+ENV/
+.eggs/
+*.egg-info/
+*.egg
+
+# Development
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Project specific
+games/
+saves/
+transcripts/
+*.z3
+*.z4
+*.z5
+*.z8
+*.ulx
+*.gblorb
+*.zblorb
+
+# Documentation
+*.md
+!README.md
+
+# Tests (not needed in production image)
+tests/
+
+# Claude
+.claude/

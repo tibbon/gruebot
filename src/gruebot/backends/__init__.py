@@ -7,6 +7,7 @@ from gruebot.backends.base import (
     InterpreterStartError,
 )
 from gruebot.backends.glulx import GlulxBackend
+from gruebot.backends.mud import MUDBackend, MUDConfig, MUDConnectionError, MUDTimeoutError
 from gruebot.backends.protocol import GameBackend, GameInfo, GameResponse, GameState
 from gruebot.backends.zmachine import ZMachineBackend
 
@@ -20,5 +21,9 @@ __all__ = [
     "InterpreterError",
     "InterpreterProcess",
     "InterpreterStartError",
+    "MUDBackend",
+    "MUDConfig",
+    "MUDConnectionError",
+    "MUDTimeoutError",
     "ZMachineBackend",
 ]
