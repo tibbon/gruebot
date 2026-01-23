@@ -1,5 +1,6 @@
 """Base utilities for subprocess-based game backends."""
 
+import select
 import subprocess
 from collections.abc import Iterator
 from dataclasses import dataclass
@@ -125,19 +126,78 @@ class InterpreterProcess:
         self,
         prompt_char: str = ">",
         timeout_lines: int = 1000,
+        read_timeout: float = 0.5,
     ) -> str:
         """Read output until a prompt character is encountered.
 
         This is useful for interpreters like dfrotz that use '>' as
-        an input prompt.
+        an input prompt. Uses select() to avoid blocking forever when
+        the interpreter outputs a prompt without a trailing newline.
 
         Args:
             prompt_char: Character that indicates prompt.
             timeout_lines: Maximum lines to read before giving up.
+            read_timeout: Timeout in seconds to wait for more data after seeing prompt.
 
         Returns:
             All output up to and including the prompt line.
         """
+        import os
+
+        # Try to get file descriptor for select-based reading
+        try:
+            fd = self._stdout.fileno()
+            if not isinstance(fd, int):
+                raise TypeError("fileno() returned non-integer")
+        except (TypeError, OSError, AttributeError):
+            # Fall back to line-based reading for mocks/non-selectable streams
+            return self._read_until_prompt_lines(prompt_char, timeout_lines)
+
+        output = []
+        current_line = ""
+
+        for _ in range(timeout_lines * 100):  # Character iterations
+            # Check if data is available
+            ready, _, _ = select.select([fd], [], [], read_timeout)
+            if not ready:
+                # No more data available - check if we have a prompt
+                if current_line.rstrip().endswith(prompt_char):
+                    if current_line:
+                        output.append(current_line)
+                    break
+                # If we have some output and no prompt, might be end of output
+                if output:
+                    if current_line:
+                        output.append(current_line)
+                    break
+                # Otherwise keep waiting
+                continue
+
+            # Read one character
+            char = os.read(fd, 1).decode("utf-8", errors="replace")
+            if not char:
+                # EOF
+                if current_line:
+                    output.append(current_line)
+                break
+
+            current_line += char
+
+            if char == "\n":
+                output.append(current_line)
+                # Check if this line ends with prompt
+                if current_line.rstrip().endswith(prompt_char):
+                    break
+                current_line = ""
+
+        return "".join(output)
+
+    def _read_until_prompt_lines(
+        self,
+        prompt_char: str = ">",
+        timeout_lines: int = 1000,
+    ) -> str:
+        """Fallback line-based reading for mocks/non-selectable streams."""
         lines = []
         for _ in range(timeout_lines):
             line = self.readline()

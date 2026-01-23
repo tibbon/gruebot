@@ -57,6 +57,9 @@ class ZMachineBackend:
         if not game_path_obj.exists():
             raise FileNotFoundError(f"Game file not found: {game_path}")
 
+        # Convert to absolute path since we run dfrotz from save_directory
+        game_path_abs = game_path_obj.resolve()
+
         # Ensure save directory exists
         self.save_directory.mkdir(parents=True, exist_ok=True)
 
@@ -64,7 +67,7 @@ class ZMachineBackend:
         # -p: Don't pause at end of page
         # -w 80: Set screen width
         self._process = InterpreterProcess.start(
-            cmd=[self.dfrotz_path, "-p", "-w", "80", str(game_path_obj)],
+            cmd=[self.dfrotz_path, "-p", "-w", "80", str(game_path_abs)],
             cwd=str(self.save_directory),
         )
 
