@@ -6,49 +6,59 @@
 
 > *"It is pitch black. You are likely to be eaten by a grue."*
 
-LLM-powered interactive fiction player. Claude acts as the player of text adventure games, providing the light to navigate through the darkness.
+A testing framework and automation tool for interactive fiction games. Run smoke tests, execute walkthroughs with assertions, or let an LLM play your game autonomously.
 
 ## Table of Contents
 
 - [Features](#features)
 - [Quick Start](#quick-start)
 - [Installation](#installation)
-- [Usage](#usage)
-- [Model Configuration](#model-configuration)
-- [Testing IF Games (CI/CD)](#testing-if-games-cicd)
+- [Testing Commands](#testing-commands)
 - [GitHub Action](#github-action)
+- [LLM Play Mode](#llm-play-mode)
 - [Development](#development)
 - [Why "Gruebot"?](#why-gruebot)
-- [License](#license)
 
 ## Features
 
+**Testing & CI/CD:**
+- Smoke tests to verify games load and respond
+- Walkthrough tests with scripted commands
+- Assertion system for validating game state
+- Reusable GitHub Action for IF projects
+- No API key required for basic testing
+
 **Game Format Support:**
-- Z-Machine via dfrotz (Infocom games, Inform 6/7 Z-code: .z3, .z5, .z8)
-- Glulx via glulxe+remglk (modern Inform 7 games: .ulx, .gblorb)
+- Z-Machine via dfrotz (Infocom, Inform 6/7: .z3, .z5, .z8)
+- Glulx via glulxe+remglk (modern Inform 7: .ulx, .gblorb)
 - MUD servers via telnet
 
-**LLM Integration:**
-- Switchable backends (Anthropic API or Claude CLI)
-- Full context management with periodic summarization
+**LLM Integration (Optional):**
+- Let Claude play your game autonomously
+- Generate transcripts for review
 - Configurable models (Sonnet, Opus)
-
-**Logging & Testing:**
-- Dual transcript logging (JSON for replay, Markdown for reading)
-- CI/CD testing with walkthroughs and assertions
-- Smoke tests, walkthrough tests, and AI playthroughs
+- Useful for difficulty testing and regression checks
 
 ## Quick Start
+
+**Test your game (no API key needed):**
 
 ```bash
 # Install
 pip install -e ".[dev]"
 
-# Set your API key
-export ANTHROPIC_API_KEY=your-key-here
+# Smoke test - verify game loads
+gruebot test mygame.z8 --smoke
 
-# Play a game
-gruebot play path/to/game.z5
+# Walkthrough test - run scripted commands
+gruebot test mygame.z8 --walkthrough tests/walkthrough.txt
+```
+
+**Let Claude play (requires API key):**
+
+```bash
+export ANTHROPIC_API_KEY=your-key-here
+gruebot test mygame.z8 --ai --max-turns 100 --transcript playthrough.md
 ```
 
 ## Installation
@@ -56,8 +66,8 @@ gruebot play path/to/game.z5
 ### Requirements
 
 - Python 3.11 or higher
-- `ANTHROPIC_API_KEY` environment variable (for play mode)
 - Game interpreter: dfrotz (Z-Machine) or glulxe (Glulx)
+- `ANTHROPIC_API_KEY` (only for LLM features)
 
 ### Install Gruebot
 
@@ -67,100 +77,31 @@ pip install -e ".[dev]"
 
 ### Install Game Interpreters
 
-#### Z-Machine (dfrotz)
-
 ```bash
-# macOS
+# Z-Machine (macOS)
 brew install frotz
 
-# Linux (Debian/Ubuntu)
+# Z-Machine (Linux)
 apt install frotz
 ```
 
-#### Glulx (glulxe with remglk)
-
-glulxe must be built with remglk for JSON I/O support:
+For Glulx games, glulxe must be built with remglk:
 
 ```bash
-# Clone repositories
 git clone https://github.com/erkyrath/remglk.git
 git clone https://github.com/erkyrath/glulxe.git
 
-# Build remglk
 cd remglk && make
-
-# Build glulxe with remglk
 cd ../glulxe
 make GLKINCLUDEDIR=../remglk GLKLIBDIR=../remglk GLKMAKEFILE=Make.remglk
-
-# Install
 sudo cp glulxe /usr/local/bin/
 ```
 
-## Usage
-
-```bash
-# Play a Z-Machine game
-gruebot play path/to/game.z5
-
-# Play a Glulx game
-gruebot play path/to/game.ulx
-
-# Connect to a MUD server
-gruebot mud mud.example.com:4000
-
-# With configuration file
-gruebot play path/to/game.z8 --config config.yaml --llm claude_cli
-
-# Show supported formats
-gruebot formats
-```
-
-## Model Configuration
-
-Gruebot defaults to Claude Sonnet. You can switch models in several ways:
-
-### CLI Option (Recommended)
-
-```bash
-# Use Opus for more capable gameplay
-gruebot play game.z5 --model claude-opus-4-20250514
-
-# Use Sonnet (default)
-gruebot play game.z5 --model claude-sonnet-4-20250514
-```
-
-### Config File
-
-Create a `config.yaml`:
-
-```yaml
-llm:
-  model: claude-opus-4-20250514
-  max_tokens: 1024
-  temperature: 0.7
-```
-
-Then run with:
-
-```bash
-gruebot play game.z5 --config config.yaml
-```
-
-### Environment Variable
-
-```bash
-export GRUEBOT_LLM__MODEL=claude-opus-4-20250514
-gruebot play game.z5
-```
-
-## Testing IF Games (CI/CD)
-
-Gruebot includes a `test` command for automated testing of interactive fiction games. This is useful for IF authors who want to test their games in CI/CD pipelines.
+## Testing Commands
 
 ### Smoke Test
 
-Verify a game loads and responds to input (**no API key required**):
+Verify a game loads and responds to basic input:
 
 ```bash
 gruebot test game.z5 --smoke
@@ -168,13 +109,13 @@ gruebot test game.z5 --smoke
 
 ### Walkthrough Test
 
-Run a sequence of commands from a file (**no API key required**):
+Run a sequence of commands and check assertions:
 
 ```bash
 gruebot test game.z5 --walkthrough walkthrough.txt
 ```
 
-### Walkthrough File Format
+**Walkthrough file format:**
 
 ```text
 # Comments start with #
@@ -204,26 +145,6 @@ gruebot test game.z5 -w walkthrough.txt \
   --expect-text "gold"
 ```
 
-### AI Play Mode
-
-Let Claude play your game autonomously (**requires `ANTHROPIC_API_KEY`**):
-
-```bash
-# Let Claude play for 100 turns, check final location
-gruebot test game.z5 --ai --max-turns 100 --expect-location "Treasure Room"
-
-# Save transcript for later analysis
-gruebot test game.z5 --ai --max-turns 50 --transcript playthrough.md
-
-# Use a specific model
-gruebot test game.z5 --ai -M claude-opus-4-20250514 --max-turns 100
-```
-
-This is useful for:
-- **Regression testing:** ensure game is completable
-- **Difficulty testing:** see how far Claude gets in N turns
-- **Generating transcripts:** for human or LLM review
-
 ### Exit Codes
 
 | Code | Meaning |
@@ -237,9 +158,7 @@ This is useful for:
 
 ## GitHub Action
 
-Gruebot provides a reusable GitHub Action for easy CI/CD integration.
-
-### Basic Usage
+Add automated testing to your IF project:
 
 ```yaml
 name: Test IF Game
@@ -252,14 +171,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Smoke test - verify game loads
       - name: Smoke test
         uses: tibbon/gruebot@v1
         with:
           game: ./mygame.z8
           mode: smoke
 
-      # Walkthrough test - run scripted commands
       - name: Walkthrough test
         uses: tibbon/gruebot@v1
         with:
@@ -269,14 +186,29 @@ jobs:
           expect-location: "Victory Room"
 ```
 
-### AI Playthrough
+### Action Inputs
 
-Let Claude play your game and check if it can win:
+| Input | Required | Default | Description |
+|-------|----------|---------|-------------|
+| `game` | Yes | - | Path to game file (.z5, .z8, .ulx, .gblorb) |
+| `mode` | No | `smoke` | Test mode: `smoke`, `walkthrough`, or `ai` |
+| `walkthrough` | For walkthrough | - | Path to walkthrough file |
+| `max-turns` | No | `50` | Maximum turns for AI mode |
+| `expect-location` | No | - | Assert final location contains text |
+| `expect-text` | No | - | Assert final output contains text |
+| `transcript` | No | - | Save transcript to this path |
+| `model` | No | - | Model for AI mode |
+| `anthropic-api-key` | For AI mode | - | Anthropic API key |
+| `verbose` | No | `false` | Show detailed output |
+
+### AI Playthrough in CI
+
+Let Claude play your game to test difficulty or generate transcripts:
 
 ```yaml
   ai-test:
     runs-on: ubuntu-latest
-    if: github.event_name == 'push'  # Save API costs on PRs
+    if: github.event_name == 'push'  # Save API costs
     steps:
       - uses: actions/checkout@v4
 
@@ -298,62 +230,70 @@ Let Claude play your game and check if it can win:
           path: ./playthrough.md
 ```
 
-### Action Inputs
-
-| Input | Required | Default | Description |
-|-------|----------|---------|-------------|
-| `game` | Yes | - | Path to game file (.z5, .z8, .ulx, .gblorb) |
-| `mode` | No | `smoke` | Test mode: `smoke`, `walkthrough`, or `ai` |
-| `walkthrough` | For walkthrough | - | Path to walkthrough file |
-| `max-turns` | No | `50` | Maximum turns for AI mode |
-| `expect-location` | No | - | Assert final location contains text |
-| `expect-text` | No | - | Assert final output contains text |
-| `transcript` | No | - | Save transcript to this path |
-| `model` | No | - | Model for AI mode |
-| `anthropic-api-key` | For AI mode | - | Anthropic API key |
-| `verbose` | No | `false` | Show detailed output |
-
-### Action Outputs
-
-| Output | Description |
-|--------|-------------|
-| `exit-code` | Test exit code (0=success) |
-| `transcript-path` | Path to generated transcript |
-
 ### Docker Alternative
 
-If you prefer using Docker directly:
+```bash
+docker run --rm \
+  -v $(pwd):/workspace -w /workspace \
+  ghcr.io/tibbon/gruebot:latest \
+  test ./mygame.z8 --walkthrough ./tests/walkthrough.txt
+```
+
+## LLM Play Mode
+
+Beyond testing, Gruebot can run interactive sessions where Claude plays your game in real-time.
+
+```bash
+# Watch Claude play
+gruebot play game.z5
+
+# Use a specific model
+gruebot play game.z5 --model claude-opus-4-20250514
+
+# Connect to a MUD
+gruebot mud mud.example.com:4000
+```
+
+### Configuration
+
+**Config file (`config.yaml`):**
 
 ```yaml
-- name: Test with Docker
-  run: |
-    docker run --rm \
-      -v ${{ github.workspace }}:/workspace \
-      -w /workspace \
-      ghcr.io/tibbon/gruebot:latest \
-      test ./mygame.z8 --walkthrough ./tests/walkthrough.txt
+llm:
+  model: claude-opus-4-20250514
+  max_tokens: 1024
+  temperature: 0.7
+```
+
+```bash
+gruebot play game.z5 --config config.yaml
+```
+
+**Environment variable:**
+
+```bash
+export GRUEBOT_LLM__MODEL=claude-opus-4-20250514
 ```
 
 ## Development
 
 ```bash
-# Install dev dependencies
 pip install -e ".[dev]"
 
-# Run linting
+# Linting
 ruff check src/ tests/
 ruff format src/ tests/
 
 # Type checking
 mypy src/
 
-# Run tests
+# Tests
 pytest tests/ -v
 ```
 
 ## Why "Gruebot"?
 
-The [grue](https://zork.fandom.com/wiki/Grue) is the iconic monster from Zork that lurks in dark places, waiting to devour adventurers who venture without a light source. Gruebot is the light - an LLM companion that illuminates the path through text adventures, preventing you from stumbling in the dark.
+The [grue](https://zork.fandom.com/wiki/Grue) is the iconic monster from Zork that lurks in dark places, waiting to devour adventurers who wander without a light source. Gruebot helps you navigate through the darkness of untested code paths - whether through automated walkthroughs or by letting an LLM explore your game and report what it finds.
 
 ## License
 
